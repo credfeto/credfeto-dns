@@ -67,7 +67,8 @@ From `docker-compose.yml`:
   (`WATCHTOWER_POLL_INTERVAL=3600`). **Confirmed not direct-to-internet:**
   Docker's daemon config (`/etc/docker/daemon.json`) sets
   `registry-mirrors: ["https://docker-cache.markridgwell.com"]`, which
-  resolves to `192.168.150.250` — an internal cache/proxy host. Watchtower
+  resolves to `192.168.150.250`/`192.168.150.251` — an internal cache/proxy
+  pair (proxy-01/proxy-02). Watchtower
   pulls through the Docker daemon/API, so it inherits this automatically;
   it only needs to reach that internal host, not Docker Hub directly.
   (Decided: keeping Watchtower — this makes that easy, no public Docker
@@ -179,9 +180,10 @@ locked down to only accept from the DNS VLAN.
 - **Confirmed:** `pacman.markridgwell.com`, `aur.markridgwell.com`,
   `dotnet.markridgwell.com`, `npm.markridgwell.com`,
   `docker-cache.markridgwell.com`, `docker-registry.markridgwell.com` and
-  `api-nuget.markridgwell.com` all resolve to the same internal host,
-  `192.168.150.250` — a single reverse-proxy/cache fronting every package
-  source. Egress for all of these is internal-only from the DNS boxes'
+  `api-nuget.markridgwell.com` all resolve to the same two internal hosts,
+  `192.168.150.250` and `192.168.150.251` (proxy-01/proxy-02) — a
+  reverse-proxy/cache pair fronting every package source. Egress for all
+  of these is internal-only from the DNS boxes'
   point of view; no external whitelisting needed for package installs.
   Still need to confirm `credfeto-setup-arch-vm`'s playbook actually uses
   these internal names rather than the real upstreams directly (see open
@@ -434,13 +436,14 @@ allow_egress_ipv6 "2606:50c0::/32" 443 tcp
 # confirm OPNsense is actually serving NTP on the DNS VLAN before relying on this.
 allow_egress_ipv4 "192.168.42.1/32" 123 udp
 
-# --- Confirmed: internal package/registry cache proxy (192.168.150.250) ---
+# --- Confirmed: internal package/registry cache proxy pair (proxy-01/proxy-02: 192.168.150.250, 192.168.150.251) ---
 # Fronts docker-cache, docker-registry, pacman, aur, dotnet, npm and
 # api-nuget (all confirmed to resolve here) - covers Watchtower's pulls
 # (via Docker's registry-mirrors setting) and, once confirmed, whatever
 # credfeto-setup-arch-vm restores. Cross-VLAN, not internet egress, but
 # still needs an explicit allow if OPNsense enforces inter-VLAN rules.
 allow_egress_ipv4 "192.168.150.250/32" 443 tcp
+allow_egress_ipv4 "192.168.150.251/32" 443 tcp
 
 # --- Confirmed: Technitium's own MSSQL query-logging app ---
 allow_egress_ipv4 "192.168.90.254/32" 1433 tcp

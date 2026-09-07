@@ -1,7 +1,7 @@
 $ORIGIN proxy.markridgwell.com.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    2       ; serial
+    3       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -9,6 +9,14 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-; Canonical A record — all internal services CNAME here
+; Canonical A record — round-robins both proxies (other zones hardcode both addresses directly, not via CNAME)
 @ IN A 192.168.150.250
+@ IN A 192.168.150.251
 @ IN AAAA 2a02:8010:61d5:150::250
+@ IN AAAA 2a02:8010:61d5:150::251
+
+; Per-node records for pinning to a specific proxy
+01 IN A 192.168.150.250
+01 IN AAAA 2a02:8010:61d5:150::250
+02 IN A 192.168.150.251
+02 IN AAAA 2a02:8010:61d5:150::251

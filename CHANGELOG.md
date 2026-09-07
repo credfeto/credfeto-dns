@@ -47,6 +47,8 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `ap-garden.lan` (`192.168.10.9`) to `zones/lan.db` - Zyxel-Garden wireless mesh access point.
 - Added `netgear-proxmox-cluster.network.lan` and `netgear-proxmox-cluster.lan` (`192.168.10.10`) to `zones/network.lan.db` and `zones/lan.db` - NETGEAR GS108Ev3 switch (serial 3UHD1B540039A), the main switch for the Proxmox cluster, on a new DHCP reservation.
 - DNS server outbound egress lockdown (firewalld dns-egress policy, inert by default via DNS_EGRESS_ENFORCE)
+- Added second proxy node proxy-02.lan (192.168.150.251 / 2a02:8010:61d5:150::251); renamed proxy.lan to proxy-01.lan.
+- Added 01.proxy.markridgwell.com and 02.proxy.markridgwell.com records for pinning to a specific proxy node.
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
@@ -60,6 +62,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - install now runs update at the end so a fresh ./install produces a fully running system
 - Egress lockdown is now enforced by default - set DNS_EGRESS_ENFORCE=false for observation mode
 - Simplified egress firewall internals - single log-only catch-all with the policy target as the sole enforcement knob (kernel log prefix is now always dns-egress-unmatched:), shared rule helper, conditional reloads
+- All 36 services previously fronted by the single proxy now resolve to both proxy-01 and proxy-02 addresses (DNS round-robin), and the internal proxy egress firewall rule allows both.
 ### Deprecated
 ### Removed
 ### Deployment Changes
