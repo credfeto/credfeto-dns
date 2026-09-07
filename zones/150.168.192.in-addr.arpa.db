@@ -1,0 +1,34 @@
+$ORIGIN 150.168.192.in-addr.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+12  IN PTR defi.lan.
+13  IN PTR gickup.lan.
+15  IN PTR notifications.lan.
+16  IN PTR audio-bookshelf.lan.
+20  IN PTR dev-upgrader-01.lan.
+21  IN PTR dev-upgrader-02.lan.
+23  IN PTR nanoclaw.lan.
+100 IN PTR dev-cache-01.lan.
+101 IN PTR dev-cache-02.lan.
+134 IN PTR monitoring.lan.
+150 IN PTR homepage.lan.
+154 IN PTR immich.lan.
+176 IN PTR development.lan.
+177 IN PTR arch-vm-test.lan.
+200 IN PTR linux-cache-01.lan.
+201 IN PTR linux-cache-02.lan.
+202 IN PTR docker-registry.lan.
+220 IN PTR keys.lan.
+
+; .250/.251 are the two reverse-proxy nodes fronting ~30 markridgwell.com
+; service zones — PTR points at the proxy node, not any of the service names.
+250 IN PTR proxy-01.markridgwell.com.
+251 IN PTR proxy-02.markridgwell.com.

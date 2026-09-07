@@ -1,0 +1,21 @@
+$ORIGIN 10.168.192.in-addr.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+1   IN PTR firewall.lan.
+2   IN PTR stairs-01.network.lan.
+3   IN PTR stairs-02.network.lan.
+4   IN PTR office.network.lan.
+5   IN PTR bedroom.network.lan.
+6   IN PTR ap-stairs.network.lan.
+7   IN PTR ap-office.network.lan.
+8   IN PTR ap-bedroom.network.lan.
+9   IN PTR ap-garden.network.lan.
+10  IN PTR netgear-proxmox-cluster.network.lan.

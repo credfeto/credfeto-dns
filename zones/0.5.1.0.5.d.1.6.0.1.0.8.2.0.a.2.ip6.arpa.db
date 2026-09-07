@@ -1,0 +1,17 @@
+$ORIGIN 0.5.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+; .250/.251 are the two reverse-proxy nodes fronting ~30 markridgwell.com
+; service zones — PTR points at the proxy node, not any of the service names.
+; 2a02:8010:61d5:150::250
+0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR proxy-01.markridgwell.com.
+; 2a02:8010:61d5:150::251
+1.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR proxy-02.markridgwell.com.
