@@ -9,7 +9,7 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-; Canonical A record — round-robins both proxies (other zones hardcode both addresses directly, not via CNAME)
+; A record — round-robins both proxies (other zones hardcode both addresses directly, not via CNAME)
 @ IN A 192.168.150.250
 @ IN A 192.168.150.251
 @ IN AAAA 2a02:8010:61d5:150::250

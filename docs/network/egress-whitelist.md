@@ -70,7 +70,7 @@ From `docker-compose.yml`:
   resolves to `192.168.150.250`/`192.168.150.251` — an internal cache/proxy
   pair (proxy-01/proxy-02). Watchtower
   pulls through the Docker daemon/API, so it inherits this automatically;
-  it only needs to reach that internal host, not Docker Hub directly.
+  it only needs to reach that internal pair, not Docker Hub directly.
   (Decided: keeping Watchtower — this makes that easy, no public Docker
   Hub range needed.)
 

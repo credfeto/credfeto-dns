@@ -126,7 +126,7 @@ Zones are maintained as BIND-format `.db` files in `zones/`. Technitium writes i
 | --- | --- | --- |
 | `lan.db` | Primary | `.lan` hostnames (Proxmox nodes, network devices) |
 | `dns.lan.db` | Primary | DNS server hostnames |
-| `proxy.markridgwell.com.db` | Primary | Canonical A/AAAA records → `192.168.150.250` (proxy-01) and `192.168.150.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
+| `proxy.markridgwell.com.db` | Primary | A/AAAA records → `192.168.150.250` (proxy-01) and `192.168.150.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
 | `<service>.markridgwell.com.db` | Override | Per-service A/AAAA → both proxy addresses (round-robin) |
 | `<resolver>.db` | Override | DoH resolver IP overrides (Cloudflare, Google, Quad9) |
 
@@ -140,7 +140,7 @@ cp zones/home.markridgwell.com.db zones/newservice.markridgwell.com.db
 # Edit the $ORIGIN line, commit, push — timer will import within 15 min.
 ```
 
-**Changing a proxy IP:** There is no CNAME chain — each `<service>.markridgwell.com.db` hardcodes both proxy addresses directly, so every file listed in `<service>.markridgwell.com.db` above (plus `proxy.markridgwell.com.db` and `lan.db`) must be edited individually and its serial bumped.
+**Changing a proxy IP:** There is no CNAME chain — each `<service>.markridgwell.com.db` hardcodes both proxy addresses directly. Every such file (plus `proxy.markridgwell.com.db` and `lan.db`) must be edited individually and its serial bumped, and the address must also be updated in `update` (egress firewall rules) and `docs/network/egress-whitelist.md`; grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
 
 ## Security notes
 
