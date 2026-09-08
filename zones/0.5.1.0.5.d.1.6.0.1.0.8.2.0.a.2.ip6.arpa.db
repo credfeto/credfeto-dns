@@ -9,9 +9,10 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-; .250/.251 are the two reverse-proxy nodes fronting ~30 markridgwell.com
-; service zones — PTR points at the proxy node, not any of the service names.
+; .250/.251 are the reverse-proxy nodes; PTR targets the node's own
+; zone record, not any of the service zones that copy its address
+; (see ai/local/dns-zones.instructions.md).
 ; 2a02:8010:61d5:150::250
-0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR proxy-01.markridgwell.com.
+0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 01.proxy.markridgwell.com.
 ; 2a02:8010:61d5:150::251
-1.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR proxy-02.markridgwell.com.
+1.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 02.proxy.markridgwell.com.

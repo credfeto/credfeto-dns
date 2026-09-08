@@ -28,7 +28,8 @@ $TTL 3600
 202 IN PTR docker-registry.lan.
 220 IN PTR keys.lan.
 
-; .250/.251 are the two reverse-proxy nodes fronting ~30 markridgwell.com
-; service zones — PTR points at the proxy node, not any of the service names.
-250 IN PTR proxy-01.markridgwell.com.
-251 IN PTR proxy-02.markridgwell.com.
+; .250/.251 are the reverse-proxy nodes; PTR targets the node's own
+; zone record, not any of the service zones that copy its address
+; (see ai/local/dns-zones.instructions.md).
+250 IN PTR 01.proxy.markridgwell.com.
+251 IN PTR 02.proxy.markridgwell.com.
