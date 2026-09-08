@@ -49,6 +49,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - DNS server outbound egress lockdown (firewalld dns-egress policy, inert by default via DNS_EGRESS_ENFORCE)
 - Added second proxy node proxy-02.lan (192.168.150.251 / 2a02:8010:61d5:150::251); renamed proxy.lan to proxy-01.lan.
 - Added 01.proxy.markridgwell.com and 02.proxy.markridgwell.com records for pinning to a specific proxy node.
+- Add reverse DNS (PTR) zones for the internal 192.168.x.0/24 subnets and the 2a02:8010:61d5::/64 subnets, populated from the existing forward zones
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
