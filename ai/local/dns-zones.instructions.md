@@ -14,11 +14,11 @@
 
 ## Choosing the PTR target name
 
-A single IP must resolve to exactly one PTR name, even when several forward zones define an A/AAAA record for it:
+A single IP must resolve to exactly one PTR name, even when several forward zones define an A/AAAA record for it: the PTR uses the name from the **most specific zone that actually owns that record**, never a flatter zone or one that merely copies the same address.
 
-* If a host's IP appears in both a flat zone (`lan.`) and a more specific child zone (`dns.lan.`, `network.lan.`), the PTR uses the **more specific zone's name** (e.g. `dns-01.dns.lan.`, not `dns-01.lan.`).
-* If an IP's owning node has its own dedicated zone with per-node sub-records (e.g. `zones/proxy.markridgwell.com.db`'s `01`/`02` records for the two reverse-proxy nodes), the PTR uses `<sub-label>.<owning-zone>.` from that dedicated zone (e.g. `01.proxy.markridgwell.com.`), never the flat `lan.` name, and never one of the many other zones that merely copy the same address (e.g. the public-facing `*.markridgwell.com` service zones that all resolve to the proxy pair).
-* If a new ambiguous case comes up that isn't covered by the rules above, ask before picking a name rather than guessing.
+* Example: a host defined in both a flat zone (`lan.`) and a more specific child zone (`dns.lan.`, `network.lan.`) uses the child zone's name (e.g. `dns-01.dns.lan.`, not `dns-01.lan.`).
+* Example: a node with its own dedicated zone and per-node sub-records (e.g. `zones/proxy.markridgwell.com.db`'s `01`/`02` records for the two reverse-proxy nodes) uses `<sub-label>.<owning-zone>.` from that dedicated zone (e.g. `01.proxy.markridgwell.com.`), never one of the many other zones that merely copy the same address (e.g. the public-facing `*.markridgwell.com` service zones that all resolve to the proxy pair).
+* If a new ambiguous case comes up that isn't covered by the principle above, ask before picking a name rather than guessing.
 
 ## Keeping reverse zones in sync (MANDATORY)
 
