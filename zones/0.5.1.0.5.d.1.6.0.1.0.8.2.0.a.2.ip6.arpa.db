@@ -9,7 +9,7 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-; .250/.251 are the reverse-proxy nodes; PTR targets the node's own
+; ::250/::251 are the reverse-proxy nodes; PTR targets the node's own
 ; zone record, not any of the service zones that copy its address
 ; (see ai/local/dns-zones.instructions.md).
 ; 2a02:8010:61d5:150::250
