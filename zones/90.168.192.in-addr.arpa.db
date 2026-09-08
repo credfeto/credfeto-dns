@@ -1,0 +1,12 @@
+$ORIGIN 90.168.192.in-addr.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+254 IN PTR sql-server.lan.

@@ -1,0 +1,18 @@
+$ORIGIN 86.168.192.in-addr.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+11  IN PTR proxmox-01.lan.
+12  IN PTR proxmox-02.lan.
+13  IN PTR proxmox-03.lan.
+14  IN PTR proxmox-04.lan.
+15  IN PTR proxmox-05.lan.
+16  IN PTR proxmox-06.lan.
+156 IN PTR xerox-b210-wired.lan.
