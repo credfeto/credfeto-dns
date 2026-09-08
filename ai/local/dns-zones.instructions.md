@@ -4,7 +4,7 @@
 
 ## Reverse zone naming
 
-* Only create reverse zones for private subnets that actually have A/AAAA records in the forward zones, not the full RFC1918/ULA space.
+* Only create reverse zones for internal subnets that actually have A/AAAA records in the forward zones, not the full private IPv4 space or the whole `2a02:8010:61d5::/48` allocation (a public IPv6 GUA prefix that this repo treats as internal; see `zones/lan.db` and the firewall-widening CHANGELOG entry).
 * IPv4: one zone per `/24` actually in use, named `<3rd-octet>.<2nd-octet>.<1st-octet>.in-addr.arpa`, file `zones/<that-name>.db`.
   e.g. `192.168.42.0/24` -> `zones/42.168.192.in-addr.arpa.db`.
 * IPv6: one zone per `/64` actually in use, named by reversing the nibbles of the first 64 bits + `.ip6.arpa`, file `zones/<that-name>.db`.
