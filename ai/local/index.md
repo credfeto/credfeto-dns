@@ -15,4 +15,4 @@ This is an index of local instructions that apply to just this project.
 ## Instruction Files
 <!-- Locally Maintained -->
 
-* [DNS Zones](dns-zones.instructions.md) — reverse zone naming, PTR target selection, and the rule to keep reverse zones in sync with forward zone changes.
+* [DNS Zones](dns-zones.instructions.md): reverse zone naming, PTR target selection, and the rule to keep reverse zones in sync with forward zone changes.
