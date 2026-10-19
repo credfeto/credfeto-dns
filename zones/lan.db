@@ -62,4 +62,3 @@ dev-cache-02        IN A 192.168.150.101
 immich              IN A 192.168.150.154
 netgear-proxmox-cluster IN A 192.168.10.10
 familiar            IN A 192.168.150.129
-home                IN A 192.168.150.150
