@@ -51,6 +51,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added 01.proxy.markridgwell.com and 02.proxy.markridgwell.com records for pinning to a specific proxy node.
 - Added reverse DNS (PTR) zones for the internal 192.168.x.0/24 and 2a02:8010:61d5:x::/64 subnets, populated from the existing forward zones
 - Added scripts to replace proxy IPs across zone files and check proxy IP consistency (#41)
+- Automated check (scripts/check-zone-sync and CI workflow) that forward A/AAAA and reverse PTR DNS zones stay in sync (#43)
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
