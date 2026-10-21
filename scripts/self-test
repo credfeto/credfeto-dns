@@ -10,6 +10,7 @@
 set -u
 
 HOST="${1:-127.0.0.1}"
+SCRIPTDIR="$(dirname "$(readlink -f "$0")")"
 ADMIN_PORT="53443"
 DOH_PORT="443"
 DNS_PORT="53"
@@ -111,6 +112,11 @@ case "${HC_STATUS}" in
         fail "DoH health-check endpoint (port ${DOH_PORT}, status ${HC_STATUS:-no response})"
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Zone files: every zone carrying a proxy address carries all of them
+# ---------------------------------------------------------------------------
+check "Zone proxy IP consistency" "${SCRIPTDIR}/check-proxy-ips"
 
 # ---------------------------------------------------------------------------
 # Summary

@@ -1,0 +1,112 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    if [ -t 2 ]; then
+        printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    else
+        printf '\n✗ %s\n' "$*" >&2
+    fi
+    exit 1
+}
+
+success() {
+    if [ -t 1 ]; then
+        printf '\n\033[32m✓\033[0m %s\n' "$*"
+    else
+        printf '\n✓ %s\n' "$*"
+    fi
+}
+
+info() {
+    if [ -t 1 ]; then
+        printf '\n\033[32m→\033[0m %s\n' "$*"
+    else
+        printf '\n→ %s\n' "$*"
+    fi
+}
+
+usage() {
+    die "Usage: check-proxy-ips [--zones DIR] [IP ...]"
+}
+
+# Prints the configured addresses that appear as A/AAAA record values, ignoring comments,
+# so reverse zones that only mention an address in a comment are not treated as carrying it.
+# shellcheck disable=SC2016
+PRESENT_AWK='
+BEGIN {
+    count = split(tolower(ips), wanted, " ")
+    for (i = 1; i <= count; i++) {
+        is_wanted[wanted[i]] = 1
+    }
+}
+
+{
+    line = $0
+    if (index(line, ";")) {
+        line = substr(line, 1, index(line, ";") - 1)
+    }
+    fields = split(line, token, /[ \t]+/)
+    for (i = 1; i < fields; i++) {
+        type = toupper(token[i])
+        value = tolower(token[i + 1])
+        if ((type == "A" || type == "AAAA") && (value in is_wanted)) {
+            seen[value] = 1
+        }
+    }
+}
+
+END {
+    for (i = 1; i <= count; i++) {
+        if (wanted[i] in seen) {
+            print wanted[i]
+        }
+    }
+}
+'
+
+ZONES_DIR="$(dirname "$(dirname "$(readlink -f "$0")")")/zones"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --zones)
+            [ $# -ge 2 ] || usage
+            ZONES_DIR="$2"
+            shift 2
+            ;;
+        --) shift; break ;;
+        -*) usage ;;
+        *) break ;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    set -- 192.168.150.250 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251
+fi
+
+[ -d "${ZONES_DIR}" ] || die "check-proxy-ips: zones directory '${ZONES_DIR}' does not exist."
+
+IPS="$(printf '%s\n' "$@" | tr 'A-F' 'a-f' | sort -u | tr '\n' ' ' | sed 's/ $//')"
+EXPECTED=$(($(printf '%s\n' "${IPS}" | wc -w)))
+
+FOUND=false
+CHECKED=0
+MISMATCHED=""
+for ZONE_FILE in "${ZONES_DIR}"/*.db; do
+    [ -f "${ZONE_FILE}" ] || continue
+    FOUND=true
+    PRESENT="$(awk -v ips="${IPS}" "${PRESENT_AWK}" "${ZONE_FILE}")"
+    [ -n "${PRESENT}" ] || continue
+    CHECKED=$((CHECKED + 1))
+    PRESENT_COUNT=$(($(printf '%s\n' "${PRESENT}" | wc -l)))
+    if [ "${PRESENT_COUNT}" -ne "${EXPECTED}" ]; then
+        info "$(basename "${ZONE_FILE}") has only: $(printf '%s' "${PRESENT}" | tr '\n' ' ')"
+        MISMATCHED="${MISMATCHED} $(basename "${ZONE_FILE}")"
+    fi
+done
+
+[ "${FOUND}" = "true" ] || die "check-proxy-ips: no zone files found in '${ZONES_DIR}'."
+[ -z "${MISMATCHED}" ] || die "check-proxy-ips: zones missing proxy addresses (expected all of ${IPS}):${MISMATCHED}"
+
+success "All ${CHECKED} zone(s) carrying proxy addresses have all ${EXPECTED}: ${IPS}"

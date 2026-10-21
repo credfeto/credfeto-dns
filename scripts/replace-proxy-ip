@@ -1,0 +1,215 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    if [ -t 2 ]; then
+        printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    else
+        printf '\n✗ %s\n' "$*" >&2
+    fi
+    exit 1
+}
+
+success() {
+    if [ -t 1 ]; then
+        printf '\n\033[32m✓\033[0m %s\n' "$*"
+    else
+        printf '\n✓ %s\n' "$*"
+    fi
+}
+
+info() {
+    if [ -t 1 ]; then
+        printf '\n\033[32m→\033[0m %s\n' "$*"
+    else
+        printf '\n→ %s\n' "$*"
+    fi
+}
+
+usage() {
+    die "Usage: replace-proxy-ip [--dry-run] [--zones DIR] OLD_IP NEW_IP"
+}
+
+is_ipv4() {
+    printf '%s\n' "$1" | grep -Eq '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$'
+}
+
+is_ipv6() {
+    printf '%s\n' "$1" | grep -Eq '^[0-9A-Fa-f:]+$' && printf '%s\n' "$1" | grep -q ':.*:'
+}
+
+address_family() {
+    if is_ipv4 "$1"; then
+        echo "ipv4"
+    elif is_ipv6 "$1"; then
+        echo "ipv6"
+    else
+        echo "invalid"
+    fi
+}
+
+# Exit status: 0 = rewritten, 1 = address not present, 2 = serial line missing or not a plain integer.
+# Lines are rebuilt token by token so the column alignment of the original file is preserved.
+# shellcheck disable=SC2016
+REPLACE_AWK='
+function record_part(line) {
+    return index(line, ";") ? substr(line, 1, index(line, ";") - 1) : line
+}
+
+function replace_value(line,    body, rest, out, seps, tokens, tail, count, i, sep, token, matched) {
+    body = record_part(line)
+    rest = substr(line, length(body) + 1)
+    count = 0
+    tail = ""
+    while (length(body) > 0) {
+        match(body, /^[ \t]*/)
+        sep = substr(body, 1, RLENGTH)
+        body = substr(body, RLENGTH + 1)
+        if (length(body) == 0) {
+            tail = sep
+            break
+        }
+        match(body, /^[^ \t]+/)
+        count++
+        seps[count] = sep
+        tokens[count] = substr(body, 1, RLENGTH)
+        body = substr(body, RLENGTH + 1)
+    }
+    matched = 0
+    for (i = 1; i < count; i++) {
+        token = toupper(tokens[i])
+        if ((token == "A" || token == "AAAA") && tolower(tokens[i + 1]) == old_ip) {
+            tokens[i + 1] = new_ip
+            matched = 1
+            break
+        }
+    }
+    if (!matched) {
+        return line
+    }
+    out = ""
+    for (i = 1; i <= count; i++) {
+        out = out seps[i] tokens[i]
+    }
+    return out tail rest
+}
+
+function bump_serial(line,    lead, number) {
+    match(line, /^[ \t]*/)
+    lead = substr(line, 1, RLENGTH)
+    if (!match(substr(line, RLENGTH + 1), /^[0-9]+/)) {
+        return ""
+    }
+    number = substr(line, length(lead) + 1, RLENGTH)
+    return lead (number + 1) substr(line, length(lead) + RLENGTH + 1)
+}
+
+BEGIN {
+    old_ip = tolower(old_ip)
+    serial_lines = 0
+    replaced = 0
+}
+
+{
+    lines[NR] = $0
+    if ($0 ~ /;[ \t]*serial([ \t]|$)/) {
+        serial_lines++
+        serial_at = NR
+    }
+    updated = replace_value($0)
+    if (updated != $0) {
+        lines[NR] = updated
+        replaced++
+    }
+}
+
+END {
+    if (replaced == 0) {
+        exit 1
+    }
+    if (serial_lines != 1) {
+        exit 2
+    }
+    bumped = bump_serial(lines[serial_at])
+    if (bumped == "") {
+        exit 2
+    }
+    lines[serial_at] = bumped
+    for (i = 1; i <= NR; i++) {
+        print lines[i]
+    }
+}
+'
+
+DRY_RUN=false
+ZONES_DIR="$(dirname "$(dirname "$(readlink -f "$0")")")/zones"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=true; shift ;;
+        --zones)
+            [ $# -ge 2 ] || usage
+            ZONES_DIR="$2"
+            shift 2
+            ;;
+        --) shift; break ;;
+        -*) usage ;;
+        *) break ;;
+    esac
+done
+
+[ $# -eq 2 ] || usage
+
+OLD_IP="$1"
+NEW_IP="$2"
+
+OLD_FAMILY="$(address_family "${OLD_IP}")"
+NEW_FAMILY="$(address_family "${NEW_IP}")"
+
+[ "${OLD_FAMILY}" != "invalid" ] || die "replace-proxy-ip: '${OLD_IP}' is not a valid IPv4 or IPv6 address."
+[ "${NEW_FAMILY}" != "invalid" ] || die "replace-proxy-ip: '${NEW_IP}' is not a valid IPv4 or IPv6 address."
+[ "${OLD_FAMILY}" = "${NEW_FAMILY}" ] || die "replace-proxy-ip: '${OLD_IP}' and '${NEW_IP}' are not the same address family."
+[ "$(printf '%s' "${OLD_IP}" | tr 'A-F' 'a-f')" != "$(printf '%s' "${NEW_IP}" | tr 'A-F' 'a-f')" ] || die "replace-proxy-ip: OLD_IP and NEW_IP are the same."
+[ -d "${ZONES_DIR}" ] || die "replace-proxy-ip: zones directory '${ZONES_DIR}' does not exist."
+
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "${WORK_DIR}"' EXIT
+trap 'exit 1' INT TERM
+
+FOUND=false
+for ZONE_FILE in "${ZONES_DIR}"/*.db; do
+    [ -f "${ZONE_FILE}" ] || continue
+    FOUND=true
+    STATUS=0
+    awk -v old_ip="${OLD_IP}" -v new_ip="${NEW_IP}" "${REPLACE_AWK}" "${ZONE_FILE}" > "${WORK_DIR}/$(basename "${ZONE_FILE}")" || STATUS=$?
+    case "${STATUS}" in
+        0) ;;
+        1) rm -f "${WORK_DIR}/$(basename "${ZONE_FILE}")" ;;
+        2) die "replace-proxy-ip: ${ZONE_FILE} has no single plain integer '; serial' line; no files changed." ;;
+        *) die "replace-proxy-ip: failed to process ${ZONE_FILE}; no files changed." ;;
+    esac
+done
+
+[ "${FOUND}" = "true" ] || die "replace-proxy-ip: no zone files found in '${ZONES_DIR}'."
+
+CHANGED=0
+for UPDATED_FILE in "${WORK_DIR}"/*.db; do
+    [ -f "${UPDATED_FILE}" ] || continue
+    ZONE_FILE="${ZONES_DIR}/$(basename "${UPDATED_FILE}")"
+    CHANGED=$((CHANGED + 1))
+    if [ "${DRY_RUN}" = "true" ]; then
+        info "Would update ${ZONE_FILE}"
+    else
+        cat "${UPDATED_FILE}" > "${ZONE_FILE}"
+        info "Updated ${ZONE_FILE}"
+    fi
+done
+
+[ "${CHANGED}" -gt 0 ] || die "replace-proxy-ip: no A/AAAA records for ${OLD_IP} found in '${ZONES_DIR}'."
+
+if [ "${DRY_RUN}" = "true" ]; then
+    success "Dry run: ${CHANGED} zone file(s) would change from ${OLD_IP} to ${NEW_IP}."
+else
+    success "Replaced ${OLD_IP} with ${NEW_IP} and bumped the serial in ${CHANGED} zone file(s)."
+fi

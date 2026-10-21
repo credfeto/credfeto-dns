@@ -98,6 +98,8 @@ docker compose restart dns-server
 | `update` | Full update: pull, start container, apply firewall rules |
 | `scripts/sync-zones` | Pull latest; import changed zones via API. `--all` imports every zone. |
 | `reset` | Stop and remove containers, then run `update` |
+| `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
+| `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
 
 ## Files
 
@@ -140,7 +142,20 @@ cp zones/home.markridgwell.com.db zones/newservice.markridgwell.com.db
 # Edit the $ORIGIN line, commit, push — timer will import within 15 min.
 ```
 
-**Changing a proxy IP:** There is no CNAME chain — each `<service>.markridgwell.com.db` hardcodes both proxy addresses directly. Every such file (plus `proxy.markridgwell.com.db` and `lan.db`) must be edited individually and its serial bumped, and the address must also be updated in `update` (egress firewall rules) and `docs/network/egress-whitelist.md`; grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
+**Changing a proxy IP:** There is no CNAME chain; each `<service>.markridgwell.com.db` hardcodes both proxy addresses directly, as do `proxy.markridgwell.com.db` and `lan.db`. Use `scripts/replace-proxy-ip` to update them all at once:
+
+```sh
+# Preview which zone files would change:
+./scripts/replace-proxy-ip --dry-run 192.168.150.250 192.168.150.252
+# Replace the address in every A/AAAA record and bump each changed zone's serial by 1:
+./scripts/replace-proxy-ip 192.168.150.250 192.168.150.252
+# Confirm every zone still carries the complete proxy address set:
+./scripts/check-proxy-ips 192.168.150.252 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251
+```
+
+Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `check-proxy-ips` with no address arguments checks the current default set (`192.168.150.250`, `192.168.150.251`, `2a02:8010:61d5:150::250` and `2a02:8010:61d5:150::251`), which `scripts/self-test` relies on, so update the defaults in the script when a proxy address changes.
+
+`replace-proxy-ip` only changes A/AAAA records. The following still need updating by hand: the reverse PTR records in `150.168.192.in-addr.arpa.db` and `0.5.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db` (bump their serials too), the egress firewall rules in `update`, and `docs/network/egress-whitelist.md`. Grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
 
 ## Security notes
 
