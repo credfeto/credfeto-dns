@@ -51,11 +51,12 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added 01.proxy.markridgwell.com and 02.proxy.markridgwell.com records for pinning to a specific proxy node.
 - Added reverse DNS (PTR) zones for the internal 192.168.x.0/24 and 2a02:8010:61d5:x::/64 subnets, populated from the existing forward zones
 - Added scripts to replace proxy IPs across zone files and check proxy IP consistency (#41)
-- Automated check (scripts/check-zone-sync and CI workflow) that forward A/AAAA and reverse PTR DNS zones stay in sync (#43)
+- Added `scripts/check-zone-sync` and a `zone-sync-check` CI workflow to verify that forward A/AAAA records and reverse PTR zones stay in sync, with unit tests (#43)
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
 - Egress ipset refresh no longer flaps on NAT64 spelling differences, and aborted update/refresh runs can no longer strand firewall runtime state behind permanent config
+- Added missing reverse DNS (PTR) record for `familiar.lan` in the `150.168.192.in-addr.arpa` zone (`zones/150.168.192.in-addr.arpa.db`)
 ### Changed
 - Removed the legacy repository `hosts` file workflow; zone files in `zones/` are now the source of truth.
 - Widened the allowed IPv6 firewall network from 2a02:8010:61d5::/64 to 2a02:8010:61d5::/48 to cover all subnets, not just subnet 0
