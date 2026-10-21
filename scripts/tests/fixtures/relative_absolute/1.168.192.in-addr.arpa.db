@@ -1,0 +1,16 @@
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+1                           IN PTR lan.
+10                          IN PTR host.lan.
+11.1.168.192.in-addr.arpa.  IN PTR other.lan.
+12                          IN PTR OTHER.LAN.
+$ORIGIN lan.
+13.1.168.192.in-addr.arpa.  IN PTR deep.sub

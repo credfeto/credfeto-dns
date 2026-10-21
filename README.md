@@ -100,6 +100,7 @@ docker compose restart dns-server
 | `reset` | Stop and remove containers, then run `update` |
 | `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
 | `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
+| `scripts/check-zone-sync` | Fail if any internal A/AAAA record has no matching PTR, or any PTR target has no A/AAAA record for its address. Run by the `PR: Zone Sync Check` workflow. |
 
 ## Files
 

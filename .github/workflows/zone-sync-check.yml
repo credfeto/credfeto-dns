@@ -1,0 +1,42 @@
+--- # PR: check forward and reverse zones stay in sync
+name: "PR: Zone Sync Check"
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, unlocked]
+    branches:
+      - main
+    paths:
+      - "zones/**"
+      - "scripts/check-zone-sync"
+      - "scripts/tests/**"
+      - ".github/workflows/zone-sync-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{github.workflow}}-${{github.ref}}"
+  cancel-in-progress: true
+
+jobs:
+  zone-sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Initialise Workspace"
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: sudo chown -R "$USER:$USER" "$GITHUB_WORKSPACE"
+
+      - name: "Checkout Source"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          fetch-depth: 1
+
+      - name: "Run zone sync unit tests"
+        shell: bash
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: "Check zone sync"
+        shell: bash
+        run: python3 scripts/check-zone-sync

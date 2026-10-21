@@ -1,0 +1,14 @@
+$ORIGIN 1.0.0.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR host.lan.
+; wrong nibble order: reads as ...::cba, so ::abc has no PTR and this one is an orphan
+a.b.c.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR other.lan.
