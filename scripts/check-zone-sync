@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""Fail if any internal A/AAAA record and its reverse PTR record disagree."""
+
+# The executable name uses kebab-case like the other scripts/ entry points.
+# pylint: disable=invalid-name
+
+import argparse
+import ipaddress
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+INTERNAL_NETWORKS = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "2a02:8010:61d5::/48",
+    )
+)
+FORWARD_TYPES = frozenset({"A", "AAAA"})
+CLASSES = frozenset({"IN", "CH", "HS"})
+NAME = "check-zone-sync"
+
+
+@dataclass(frozen=True)
+class Record:
+    """One resource record with its owner and any name data made absolute."""
+
+    owner: str
+    rtype: str
+    data: str
+
+
+@dataclass(frozen=True)
+class Zone:
+    """The records parsed from one zone file."""
+
+    name: str
+    records: tuple
+
+
+def absolute_name(name, origin):
+    """Resolve a zone file name against the current origin."""
+    if name == "@":
+        return origin
+    if name.endswith("."):
+        return name.lower()
+    return f"{name}.{origin}".lower()
+
+
+def logical_lines(text):
+    """Yield (starts_with_owner, tokens) for each entry.
+
+    Lines inside parentheses are joined into a single entry.
+    """
+    pending = []
+    owner_present = True
+    depth = 0
+    for raw in text.splitlines():
+        line = raw.split(";", 1)[0]
+        if not pending:
+            owner_present = bool(line) and not line[0].isspace()
+        depth += line.count("(") - line.count(")")
+        pending.extend(line.replace("(", " ").replace(")", " ").split())
+        if depth <= 0 and pending:
+            yield owner_present, pending
+            pending = []
+            depth = 0
+
+
+def is_ttl_or_class(field):
+    """Whether a field is a TTL or a class."""
+    return field.isdigit() or field.upper() in CLASSES
+
+
+def strip_ttl_and_class(fields):
+    """Drop the optional TTL and class, which may appear in either order."""
+    remaining = list(fields)
+    while remaining and is_ttl_or_class(remaining[0]):
+        remaining.pop(0)
+    return remaining
+
+
+def parse_zone(name, text):
+    """Parse the zone file text for the zone called name."""
+    zone_name = f"{name.rstrip('.')}.".lower()
+    origin = zone_name
+    owner = origin
+    records = []
+    for owner_present, tokens in logical_lines(text):
+        if tokens[0].upper() == "$ORIGIN":
+            origin = absolute_name(tokens[1], origin)
+            continue
+        if tokens[0].startswith("$"):
+            continue
+        if owner_present:
+            owner = absolute_name(tokens[0], origin)
+            tokens = tokens[1:]
+        fields = strip_ttl_and_class(tokens)
+        if len(fields) < 2:
+            continue
+        rtype = fields[0].upper()
+        data = fields[1]
+        if rtype == "PTR":
+            data = absolute_name(data, origin)
+        records.append(Record(owner, rtype, data))
+    return Zone(zone_name, tuple(records))
+
+
+def load_zones(zones_dir):
+    """Parse every *.db file in zones_dir.
+
+    The zone name is the file name minus .db.
+    """
+    return [
+        parse_zone(path.name[: -len(".db")], path.read_text(encoding="utf-8"))
+        for path in sorted(Path(zones_dir).glob("*.db"))
+    ]
+
+
+def is_internal(address):
+    """Whether the address is in a network that needs reverse zones."""
+    return any(address in network for network in INTERNAL_NETWORKS)
+
+
+def reverse_name(address):
+    """The absolute PTR owner name for an address."""
+    return f"{address.reverse_pointer}."
+
+
+def internal_forward_owners(zones):
+    """Map internal PTR owner names to (address, forward owner names)."""
+    owners = {}
+    for zone in zones:
+        for record in zone.records:
+            if record.rtype not in FORWARD_TYPES:
+                continue
+            address = ipaddress.ip_address(record.data)
+            if is_internal(address):
+                key = reverse_name(address)
+                entry = owners.setdefault(key, (address, set()))
+                entry[1].add(record.owner)
+    return owners
+
+
+def ptr_records(zones):
+    """Every PTR record in every zone, as (zone name, record)."""
+    return [
+        (zone.name, record)
+        for zone in zones
+        for record in zone.records
+        if record.rtype == "PTR"
+    ]
+
+
+def is_reverse_zone(zone):
+    """Whether the zone is an in-addr.arpa or ip6.arpa reverse zone."""
+    return zone.name.endswith(".arpa.")
+
+
+def is_in_zone(name, zone_name):
+    """Whether name is zone_name or a name below it."""
+    return name == zone_name or name.endswith(f".{zone_name}")
+
+
+def missing_ptr_errors(forward, ptrs, zones):
+    """Report internal addresses with no reverse zone or no PTR."""
+    ptr_owners = {record.owner for _, record in ptrs}
+    reverse_zones = [zone.name for zone in zones if is_reverse_zone(zone)]
+    errors = []
+    for reverse, (address, owners) in sorted(forward.items()):
+        if reverse in ptr_owners:
+            continue
+        host = f"{address} ({', '.join(sorted(owners))})"
+        if any(is_in_zone(reverse, zone) for zone in reverse_zones):
+            errors.append(f"no PTR for {host}: expected {reverse}")
+        else:
+            errors.append(f"no reverse zone for {host}")
+    return errors
+
+
+def ptr_target_errors(forward, ptrs):
+    """Report PTR records whose target lacks a matching A/AAAA record."""
+    errors = []
+    for zone_name, record in ptrs:
+        owners = forward.get(record.owner)
+        if owners is None:
+            errors.append(
+                f"orphan PTR {record.owner} -> {record.data} in {zone_name}: "
+                "no A/AAAA record has this address"
+            )
+        elif record.data not in owners[1]:
+            errors.append(
+                f"PTR {record.owner} -> {record.data} in {zone_name}: "
+                f"target has no A/AAAA record for {owners[0]} "
+                f"(expected one of {', '.join(sorted(owners[1]))})"
+            )
+    return errors
+
+
+def check_zones(zones):
+    """Return a message for each forward/reverse zone mismatch."""
+    forward = internal_forward_owners(zones)
+    ptrs = ptr_records(zones)
+    missing = missing_ptr_errors(forward, ptrs, zones)
+    return missing + ptr_target_errors(forward, ptrs)
+
+
+def default_zones_dir():
+    """The zones directory next to the scripts directory."""
+    return Path(__file__).resolve().parent.parent / "zones"
+
+
+def colour(code, text, stream):
+    """Wrap text in an ANSI colour when writing to a terminal."""
+    return f"\033[{code}m{text}\033[0m" if stream.isatty() else text
+
+
+def main(argv=None):
+    """Command line entry point; returns the process exit code."""
+    description = (
+        "Check every internal A/AAAA record has a matching PTR and every "
+        "PTR target has an A/AAAA record for the same address."
+    )
+    parser = argparse.ArgumentParser(prog=NAME, description=description)
+    parser.add_argument(
+        "--zones",
+        type=Path,
+        default=default_zones_dir(),
+        help="zone directory",
+    )
+    args = parser.parse_args(argv)
+    if not args.zones.is_dir():
+        message = f"✗ {NAME}: no such directory: {args.zones}"
+        print(colour("31", message, sys.stderr), file=sys.stderr)
+        return 1
+    errors = check_zones(load_zones(args.zones))
+    for error in errors:
+        print(colour("31", f"✗ {NAME}: {error}", sys.stderr), file=sys.stderr)
+    if errors:
+        return 1
+    message = f"✓ {NAME}: forward and reverse zones are in sync"
+    print(colour("32", message, sys.stdout))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
