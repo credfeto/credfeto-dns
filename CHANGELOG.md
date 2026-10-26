@@ -52,7 +52,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added reverse DNS (PTR) zones for the internal 192.168.x.0/24 and 2a02:8010:61d5:x::/64 subnets, populated from the existing forward zones
 - Added scripts to replace proxy IPs across zone files and check proxy IP consistency (#41)
 - Added `scripts/check-zone-sync` and a `zone-sync-check` CI workflow to verify that forward A/AAAA records and reverse PTR zones stay in sync, with unit tests (#43)
-- TBD - to be finalized after review
+- Added `workflow-mcp.markridgwell.com` DNS zone (`zones/workflow-mcp.markridgwell.com.db`) resolving to the reverse-proxy pair (`192.168.150.250` / `192.168.150.251` and IPv6 equivalents) (#46)
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
