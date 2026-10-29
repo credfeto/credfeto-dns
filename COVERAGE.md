@@ -14,6 +14,7 @@ n/a (no code)
 
 | Package | Line Coverage |
 | --- | --- |
+| scripts/check-zone-sync | 98.5% |
 | **Overall (Python)** | **98.5%** |
 
 ## Shell
@@ -22,4 +23,4 @@ excluded
 
 ---
 
-Captured at commit `406e6bf34464c842e361a7a07294fece11e863f2` on 2026-10-26.
+Captured at commit `91957173bfb697db3cad08c68981d6193ea7b6b1` on 2026-10-29.
