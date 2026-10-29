@@ -53,7 +53,6 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added scripts to replace proxy IPs across zone files and check proxy IP consistency (#41)
 - Added `scripts/check-zone-sync` and a `zone-sync-check` CI workflow to verify that forward A/AAAA records and reverse PTR zones stay in sync, with unit tests (#43)
 - Added `workflow-mcp.markridgwell.com` zone resolving to the reverse-proxy pair (#46)
-- Added new reverse DNS zone `zones/2.168.192.in-addr.arpa.db` for `192.168.2.0/24` with PTR records for `stairs-01` (`192.168.2.2`), `stairs-02` (`192.168.2.3`), `office` (`192.168.2.4`) and `bedroom` (`192.168.2.5`) (#46)
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
@@ -61,6 +60,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added missing reverse DNS (PTR) record for `familiar.lan` in the `150.168.192.in-addr.arpa` zone (`zones/150.168.192.in-addr.arpa.db`)
 - Added missing reverse DNS (PTR) records for `netgear-printer` (`192.168.10.11`) and `netgear-office1` (`192.168.10.129`) to `zones/10.168.192.in-addr.arpa.db` (#46)
 - Corrected the reverse DNS (PTR) record for `192.168.10.1` in `zones/10.168.192.in-addr.arpa.db` to point at `opnsense.network.lan` instead of `firewall.lan` (#46)
+- Added missing reverse DNS zone `zones/2.168.192.in-addr.arpa.db` for `192.168.2.0/24` with PTR records for `stairs-01` (`192.168.2.2`), `stairs-02` (`192.168.2.3`), `office` (`192.168.2.4`) and `bedroom` (`192.168.2.5`) (#46)
 ### Changed
 - Removed the legacy repository `hosts` file workflow; zone files in `zones/` are now the source of truth.
 - Widened the allowed IPv6 firewall network from 2a02:8010:61d5::/64 to 2a02:8010:61d5::/48 to cover all subnets, not just subnet 0
