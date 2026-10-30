@@ -1,0 +1,6 @@
+[run]
+omit =
+    scripts/tests/*
+
+[report]
+precision = 1

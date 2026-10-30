@@ -1,7 +1,7 @@
 $ORIGIN 10.168.192.in-addr.arpa.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    1       ; serial
+    3       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -9,7 +9,7 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-1   IN PTR firewall.lan.
+1   IN PTR opnsense.network.lan.
 2   IN PTR stairs-01.network.lan.
 3   IN PTR stairs-02.network.lan.
 4   IN PTR office.network.lan.
@@ -19,3 +19,5 @@ $TTL 3600
 8   IN PTR ap-bedroom.network.lan.
 9   IN PTR ap-garden.network.lan.
 10  IN PTR netgear-proxmox-cluster.network.lan.
+11  IN PTR netgear-printer.network.lan.
+129 IN PTR netgear-office1.network.lan.
