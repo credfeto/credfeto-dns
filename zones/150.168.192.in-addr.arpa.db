@@ -1,7 +1,7 @@
 $ORIGIN 150.168.192.in-addr.arpa.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    2       ; serial
+    3       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -16,6 +16,7 @@ $TTL 3600
 20  IN PTR dev-upgrader-01.lan.
 21  IN PTR dev-upgrader-02.lan.
 23  IN PTR nanoclaw.lan.
+30  IN PTR memory.lan.
 100 IN PTR dev-cache-01.lan.
 101 IN PTR dev-cache-02.lan.
 129 IN PTR familiar.lan.
