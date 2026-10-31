@@ -24,7 +24,7 @@ die() {
 # short by hand rather than risking a future domain producing a name
 # that's silently too long. Keep in sync with the ipset/rule slug list in
 # ./update if a domain is ever added, removed or renamed here.
-DOMAIN_SLUGS="github.com:github cdn-mirror.chaotic.cx:chaotic"
+DOMAIN_SLUGS="github.com:github cdn-mirror.chaotic.cx:chaotic pkgstats.archlinux.de:pkgstats"
 
 CHANGED=false
 

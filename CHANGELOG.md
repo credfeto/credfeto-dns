@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Egress allow-list: pkgstats.archlinux.de (HTTPS) via the dynamic ipsets, so the weekly pkgstats.timer submission stops failing, retrying and logging dns-egress-unmatched drops
 - Added .ai-instructions and ai/local/index.md from cs-template standard
 - Added `dev-upgrader-01.lan` (`192.168.150.20`) to `zones/lan.db`.
 - Added `dev-upgrader-02.lan` (`192.168.150.21`) to `zones/lan.db`.
