@@ -53,6 +53,9 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added scripts to replace proxy IPs across zone files and check proxy IP consistency (#41)
 - Added `scripts/check-zone-sync` and a `zone-sync-check` CI workflow to verify that forward A/AAAA records and reverse PTR zones stay in sync, with unit tests (#43)
 - Added `workflow-mcp.markridgwell.com` zone resolving to the reverse-proxy pair (#46)
+- Added `memory.lan` (`192.168.150.30`) to `zones/lan.db` with a matching PTR record in `zones/150.168.192.in-addr.arpa.db` (#49)
+- Added `memory.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
+- Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 ### Fixed
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
