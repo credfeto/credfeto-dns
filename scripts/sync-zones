@@ -70,11 +70,52 @@ if [ "${IMPORT_ALL}" = "true" ]; then
     exit 0
 fi
 
+# Written by ./update once it has applied the host config at that commit.
+# Keep in sync with ./update.
+APPLIED_HEAD_FILE="/var/lib/credfeto-adguard-home/applied-head"
+
+# Paths whose changes only take effect when ./update runs: the firewall
+# and egress rules (update), the dynamic egress ipset refresher and its
+# timer, and the container definition.
+HOST_CONFIG_PATHS="update docker-compose.yml scripts/refresh-egress-ipsets scripts/dns-egress-refresh.service scripts/dns-egress-refresh.timer"
+
+# Re-run ./update when the checkout holds host-config changes that were
+# never applied since the commit ./update last recorded. With no usable
+# record (a node set up before this existed, or a commit that is no
+# longer in the history) ./update runs once to establish one. ./update
+# is idempotent and finishes with sync-zones --all, so every zone is
+# re-imported too. Exits the script when it runs.
+run_update() {
+    echo "sync-zones: running ./update to apply host config ($1)..."
+    "${BASEDIR}/update" || die "sync-zones: ./update failed; will retry on the next run."
+    echo "sync-zones: done (./update applied host config and imported all zones)."
+    exit 0
+}
+
+apply_host_config_if_changed() {
+    _head="$(git -C "${BASEDIR}" rev-parse HEAD)"
+    _applied="$(cat "${APPLIED_HEAD_FILE}" 2> /dev/null || true)"
+    if [ -z "${_applied}" ] || ! git -C "${BASEDIR}" cat-file -e "${_applied}^{commit}" 2> /dev/null; then
+        run_update "no applied-commit record"
+    fi
+    [ "${_applied}" != "${_head}" ] || return 0
+
+    # shellcheck disable=SC2086 # HOST_CONFIG_PATHS is a word list
+    _changed="$(git -C "${BASEDIR}" diff --name-only "${_applied}..${_head}" -- ${HOST_CONFIG_PATHS})"
+    [ -n "${_changed}" ] || return 0
+
+    echo "sync-zones: host config changed since ${_applied}:"
+    printf '  %s\n' ${_changed}
+    run_update "changed since last apply"
+}
+
 PREV_HEAD="$(git -C "${BASEDIR}" rev-parse HEAD)"
 
 git -C "${BASEDIR}" pull
 
 NEW_HEAD="$(git -C "${BASEDIR}" rev-parse HEAD)"
+
+apply_host_config_if_changed
 
 if [ "${PREV_HEAD}" = "${NEW_HEAD}" ]; then
     echo "sync-zones: no changes pulled, nothing to do."

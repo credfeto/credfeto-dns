@@ -133,6 +133,9 @@ ensure_ipset() {
 
 BASEDIR="$(dirname "$(readlink -f "$0")")"
 
+# Keep in sync with scripts/sync-zones.
+APPLIED_HEAD_FILE="/var/lib/credfeto-adguard-home/applied-head"
+
 # docker compose (below) resolves docker-compose.yml relative to the
 # current working directory, not BASEDIR - without this, running the
 # script via an absolute/relative path from elsewhere fails with "no
@@ -346,4 +349,13 @@ sudo systemctl enable --now dns-egress-refresh.timer
 # first fire.
 sudo /usr/local/bin/refresh-egress-ipsets
 
-"${BASEDIR}/scripts/sync-zones" --all
+"${BASEDIR}/scripts/sync-zones" --all || die "Zone import failed"
+
+# Record the commit whose host config (firewall/egress, compose, timers)
+# is now live. scripts/sync-zones compares against this after each pull
+# and re-runs ./update when a pulled commit changed any of that config,
+# so fixes such as new egress allow-list entries don't sit in the
+# checkout unapplied until someone runs ./update by hand.
+sudo mkdir -p "$(dirname "${APPLIED_HEAD_FILE}")"
+git -C "${BASEDIR}" rev-parse HEAD | sudo tee "${APPLIED_HEAD_FILE}" > /dev/null \
+    || die "Could not record applied commit in ${APPLIED_HEAD_FILE}"

@@ -70,7 +70,7 @@ Pulls the latest repo changes, ensures the container is running, applies firewal
 
 ### Zone changes
 
-Edit zone files in `zones/`, commit, and push. The systemd timer will pick up the changes within 15 minutes and import the updated zones via the Technitium API. To apply immediately:
+Edit zone files in `zones/`, commit, and push. The systemd timer will pick up the changes within 15 minutes and import the updated zones via the Technitium API. Changes to `update` (firewall and egress rules), `docker-compose.yml` or the egress ipset refresher are applied the same way: `sync-zones` runs `./update` when the checkout is ahead of the commit `./update` last applied (recorded in `/var/lib/credfeto-adguard-home/applied-head`). To apply immediately:
 
 ```sh
 ./scripts/sync-zones
@@ -96,7 +96,7 @@ docker compose restart dns-server
 | --- | --- |
 | `install` | Installs and enables the systemd timer for zone sync |
 | `update` | Full update: pull, start container, apply firewall rules |
-| `scripts/sync-zones` | Pull latest; import changed zones via API. `--all` imports every zone. |
+| `scripts/sync-zones` | Pull latest; import changed zones via API. If the pulled commits change host config (`update`, `docker-compose.yml`, the egress ipset refresher or its timer) that hasn't been applied yet, it runs `./update` instead. `--all` imports every zone. |
 | `reset` | Stop and remove containers, then run `update` |
 | `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
 | `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
