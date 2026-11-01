@@ -76,6 +76,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Egress lockdown is now enforced by default - set DNS_EGRESS_ENFORCE=false for observation mode
 - Simplified egress firewall internals - single log-only catch-all with the policy target as the sole enforcement knob (kernel log prefix is now always dns-egress-unmatched:), shared rule helper, conditional reloads
 - All 36 services previously fronted by the single proxy now resolve to both proxy-01 and proxy-02 addresses (DNS round-robin), and the internal proxy egress firewall rule allows both.
+- Watchtower now removes old images after each update (WATCHTOWER_CLEANUP=true) and its fixed poll interval is replaced by an overridable 6-field cron WATCHTOWER_SCHEDULE, defaulting to hourly at minute 12 (set in .env)
 ### Deprecated
 ### Removed
 - Removed the obsolete AdGuard Home `certs/` folder (`adguard.local.crt`, `.key` and `.pem`), which nothing referenced (#46)

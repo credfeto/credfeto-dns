@@ -9,7 +9,8 @@ services:
     restart: always
     environment:
       WATCHTOWER_NOTIFICATIONS_HOSTNAME: dns
-      WATCHTOWER_POLL_INTERVAL: 3600
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "${WATCHTOWER_SCHEDULE:-0 12 * * * *}"
 
   dns-server:
     image: docker.io/technitium/dns-server:latest
