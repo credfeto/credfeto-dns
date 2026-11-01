@@ -24,6 +24,10 @@ cp .env.example .env
 # Edit .env and set a strong DNS_ADMIN_PASSWORD
 ```
 
+Optionally set `WATCHTOWER_SCHEDULE` in `.env` (6-field cron, seconds first) to
+override when Watchtower checks for image updates; the default `0 12 * * * *`
+runs hourly at minute 12. Old images are cleaned up after each update.
+
 ### 2. Install the zone sync timer
 
 ```sh

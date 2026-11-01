@@ -63,8 +63,8 @@ From `docker-compose.yml`:
   now removed (adblockplusrules#622 closed as not planned). The Fastly
   allow rule exists solely for `abp.markridgwell.com`, and goes away
   entirely once adblockplusrules#623 (local serving) lands.
-- `watchtower` — polls for image updates every hour
-  (`WATCHTOWER_POLL_INTERVAL=3600`). **Confirmed not direct-to-internet:**
+- `watchtower` — checks for image updates hourly at minute 12
+  (`WATCHTOWER_SCHEDULE`, default `0 12 * * * *`, overridable via `.env`). **Confirmed not direct-to-internet:**
   Docker's daemon config (`/etc/docker/daemon.json`) sets
   `registry-mirrors: ["https://docker-cache.markridgwell.com"]`, which
   resolves to `192.168.150.250`/`192.168.150.251` — an internal cache/proxy
