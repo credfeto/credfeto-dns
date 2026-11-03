@@ -302,7 +302,7 @@ allow_egress ipv4 192.168.90.254/32 tcp 1433
 # slug list in sync with scripts/refresh-egress-ipsets's DOMAIN_SLUGS if
 # a domain is ever added, removed or renamed.
 EXISTING_IPSETS="$(sudo firewall-cmd --permanent --get-ipsets)"
-for SLUG in github chaotic pkgstats; do
+for SLUG in github chaotic pkgstats archwkd; do
     ensure_ipset "dns-egress-${SLUG}-v4" inet
     ensure_ipset "dns-egress-${SLUG}-v6" inet6
 done
@@ -314,7 +314,7 @@ if [ "${IPSET_CREATED}" = "true" ]; then
     sudo firewall-cmd --reload
 fi
 
-for SLUG in github chaotic pkgstats; do
+for SLUG in github chaotic pkgstats archwkd; do
     allow_egress_ipset ipv4 "dns-egress-${SLUG}-v4" tcp 443
     allow_egress_ipset ipv6 "dns-egress-${SLUG}-v6" tcp 443
 done

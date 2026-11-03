@@ -13,6 +13,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 - `scripts/sync-zones` now runs `./update` when pulled commits change host config (`update`, `docker-compose.yml`, `scripts/refresh-egress-ipsets` or its timer) that hasn't been applied yet, so firewall/egress fixes go live on the next 15-minute sync instead of waiting for a manual `./update`. `./update` records the applied commit in `/var/lib/credfeto-adguard-home/applied-head`.
+- Egress allow-list: openpgpkey.archlinux.org (HTTPS, WKD) via the dynamic ipsets, so the weekly archlinux-keyring-wkd-sync.timer key refresh stops failing, retrying every 5 minutes (Restart=on-failure) and logging thousands of dns-egress-unmatched drops a day
 - Egress allow-list: pkgstats.archlinux.de (HTTPS) via the dynamic ipsets, so the weekly pkgstats.timer submission stops failing, retrying and logging dns-egress-unmatched drops
 - Added .ai-instructions and ai/local/index.md from cs-template standard
 - Added `dev-upgrader-01.lan` (`192.168.150.20`) to `zones/lan.db`.
