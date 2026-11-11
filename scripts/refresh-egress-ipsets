@@ -97,4 +97,71 @@ for _pair in ${DOMAIN_SLUGS}; do
     sync_ipset "dns-egress-${_slug}-v6" "${_v6}"
 done
 
+# GitHub publishes its address ranges, so allow those as networks rather
+# than chasing whichever single address github.com resolves to (it rotates
+# every few minutes). The list ships in the repo (scripts/github-egress-
+# ranges, installed by ./update) and is refreshed there with
+# scripts/update-github-egress-ranges. The resolved-address github sets
+# above stay as a fallback for any address GitHub hasn't published yet.
+GITHUB_RANGES="/usr/local/share/credfeto-adguard-home/github-egress-ranges"
+
+# Prints "+net" / "-net" lines to turn the current entries (stdin) into
+# the wanted ones. Compares parsed networks, so firewalld's own rendering
+# of an entry (e.g. dropping /32) can't cause churn and a needless reload.
+# For v6 the wanted set is the native v6 ranges plus the NAT64 (64:ff9b::/96)
+# form of every v4 range, matching the per-domain sets above.
+#
+# The Python goes in -c, not a heredoc: a heredoc would take over stdin,
+# which has to carry the current entries.
+ghnet_diff() {
+    python3 -c '
+import ipaddress, sys
+family, path = int(sys.argv[1]), sys.argv[2]
+nat64 = ipaddress.ip_network("64:ff9b::/96")
+wanted = set()
+with open(path) as f:
+    for line in f:
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        net = ipaddress.ip_network(line, strict=False)
+        if net.version == family:
+            wanted.add(net)
+        elif family == 6:
+            base = int(nat64.network_address) + int(net.network_address)
+            wanted.add(ipaddress.ip_network((base, 96 + net.prefixlen)))
+current = {}
+for line in sys.stdin:
+    line = line.strip()
+    if line:
+        current[ipaddress.ip_network(line, strict=False)] = line
+for net, raw in current.items():
+    if net not in wanted:
+        print("-" + raw)
+for net in sorted(wanted - current.keys()):
+    print("+" + str(net))
+' "$1" "${GITHUB_RANGES}"
+}
+
+sync_ghnet() {
+    _set="$1"
+    _family="$2"
+    _ops="$(firewall-cmd --permanent --ipset="${_set}" --get-entries 2>/dev/null | ghnet_diff "${_family}")" || return 0
+    [ -n "${_ops}" ] || return 0
+    CHANGED=true
+    printf '%s\n' "${_ops}" | while IFS= read -r _op; do
+        case "${_op}" in
+            -*) firewall-cmd --permanent --ipset="${_set}" --remove-entry="${_op#-}" > /dev/null ;;
+            +*) firewall-cmd --permanent --ipset="${_set}" --add-entry="${_op#+}" > /dev/null ;;
+        esac
+    done
+}
+
+if [ -r "${GITHUB_RANGES}" ] && command -v python3 > /dev/null; then
+    sync_ghnet dns-egress-ghnet-v4 4
+    sync_ghnet dns-egress-ghnet-v6 6
+else
+    echo "warning: ${GITHUB_RANGES} or python3 missing; GitHub ranges not synced (run ./update)" >&2
+fi
+
 # Reload happens in the EXIT trap above.

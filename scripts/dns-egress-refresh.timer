@@ -4,6 +4,10 @@ Description=Periodically refresh dynamic DNS-egress firewalld ipsets
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=10min
+# Wall-clock trigger as well: the monotonic triggers above never re-arm
+# if the boot trigger is missed (e.g. the units are rewritten after boot),
+# which left the timer stalled in "elapsed" with the ipsets frozen.
+OnCalendar=*:0/10
 RandomizedDelaySec=1min
 AccuracySec=1s
 Persistent=true

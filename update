@@ -122,8 +122,9 @@ IPSET_CREATED=false
 ensure_ipset() {
     NAME="$1"
     FAMILY="$2"
+    TYPE="${3:-hash:ip}"
     if ! printf '%s' "${EXISTING_IPSETS}" | grep -qw "${NAME}"; then
-        sudo firewall-cmd --permanent --new-ipset="${NAME}" --type=hash:ip --option=family="${FAMILY}" || die "Failed to create ipset ${NAME}"
+        sudo firewall-cmd --permanent --new-ipset="${NAME}" --type="${TYPE}" --option=family="${FAMILY}" || die "Failed to create ipset ${NAME}"
         IPSET_CREATED=true
         FIREWALL_CHANGED=true
     fi
@@ -306,6 +307,10 @@ for SLUG in github chaotic pkgstats archwkd; do
     ensure_ipset "dns-egress-${SLUG}-v4" inet
     ensure_ipset "dns-egress-${SLUG}-v6" inet6
 done
+# GitHub's published ranges (scripts/github-egress-ranges) - networks, so
+# hash:net. Populated by scripts/refresh-egress-ipsets.
+ensure_ipset dns-egress-ghnet-v4 inet hash:net
+ensure_ipset dns-egress-ghnet-v6 inet6 hash:net
 
 # A newly created --permanent ipset isn't recognised as a valid
 # rich-rule destination target until firewalld reloads — without this,
@@ -318,6 +323,8 @@ for SLUG in github chaotic pkgstats archwkd; do
     allow_egress_ipset ipv4 "dns-egress-${SLUG}-v4" tcp 443
     allow_egress_ipset ipv6 "dns-egress-${SLUG}-v6" tcp 443
 done
+allow_egress_ipset ipv4 dns-egress-ghnet-v4 tcp 443
+allow_egress_ipset ipv6 dns-egress-ghnet-v6 tcp 443
 
 # Catch-all, evaluated dead last (priority 32767): logs any egress not
 # matched by an allow rule above, with NO action of its own, so the
@@ -340,10 +347,15 @@ finish_firewall
 
 # Install and enable the dynamic-egress ipset refresh timer.
 sudo install -m 755 "${BASEDIR}/scripts/refresh-egress-ipsets" /usr/local/bin/refresh-egress-ipsets
+sudo install -d -m 755 /usr/local/share/credfeto-adguard-home
+sudo install -m 644 "${BASEDIR}/scripts/github-egress-ranges" /usr/local/share/credfeto-adguard-home/github-egress-ranges
 sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.service" /etc/systemd/system/dns-egress-refresh.service
 sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.timer" /etc/systemd/system/dns-egress-refresh.timer
 sudo systemctl daemon-reload
-sudo systemctl enable --now dns-egress-refresh.timer
+sudo systemctl enable dns-egress-refresh.timer
+# restart, not just enable --now: an already-active timer would keep its
+# old (possibly stalled) schedule instead of picking up the new unit.
+sudo systemctl restart dns-egress-refresh.timer
 
 # Populate the ipsets immediately rather than waiting for the timer's
 # first fire.
