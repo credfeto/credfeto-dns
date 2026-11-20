@@ -1,7 +1,7 @@
 $ORIGIN 150.168.192.in-addr.arpa.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    5       ; serial
+    6       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -15,7 +15,8 @@ $TTL 3600
 16  IN PTR audio-bookshelf.lan.
 20  IN PTR dev-upgrader-01.lan.
 21  IN PTR dev-upgrader-02.lan.
-23  IN PTR nanoclaw.lan.
+23  IN PTR credfeto.orchestrator.lan.
+24  IN PTR funfair-tech.orchestrator.lan.
 30  IN PTR memory.lan.
 31  IN PTR trmnl.lan.
 32  IN PTR oxidized.lan.

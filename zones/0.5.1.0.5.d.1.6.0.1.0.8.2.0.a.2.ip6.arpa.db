@@ -1,7 +1,7 @@
 $ORIGIN 0.5.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    1       ; serial
+    2       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -16,3 +16,7 @@ $TTL 3600
 0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 01.proxy.markridgwell.com.
 ; 2a02:8010:61d5:150::251
 1.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 02.proxy.markridgwell.com.
+; 2a02:8010:61d5:150::17
+7.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR credfeto.orchestrator.lan.
+; 2a02:8010:61d5:150::18
+8.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR funfair-tech.orchestrator.lan.
