@@ -12,7 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
-- `credfeto.orchestrator.lan` (`192.168.150.23`, `2a02:8010:61d5:150::17`) and `funfair-tech.orchestrator.lan` (`192.168.150.24`, `2a02:8010:61d5:150::18`) in `zones/lan.db` with IPv4 and IPv6 PTRs, for the orchestrator split into one VM per owner. `nanoclaw.lan` is now a CNAME to `credfeto.orchestrator.lan`.
+- `credfeto.orchestrator.lan` (`192.168.150.23`, `2a02:8010:61d5:150::17`) and `funfair-tech.orchestrator.lan` (`192.168.150.24`, `2a02:8010:61d5:150::18`) in `zones/lan.db` with IPv4 and IPv6 PTRs, for the orchestrator split into one VM per owner.
 - `scripts/sync-zones` now runs `./update` when pulled commits change host config (`update`, `docker-compose.yml`, `scripts/refresh-egress-ipsets` or its timer) that hasn't been applied yet, so firewall/egress fixes go live on the next 15-minute sync instead of waiting for a manual `./update`. `./update` records the applied commit in `/var/lib/credfeto-adguard-home/applied-head`.
 - Egress allow-list: openpgpkey.archlinux.org (HTTPS, WKD) via the dynamic ipsets, so the weekly archlinux-keyring-wkd-sync.timer key refresh stops failing, retrying every 5 minutes (Restart=on-failure) and logging thousands of dns-egress-unmatched drops a day
 - Egress allow-list: pkgstats.archlinux.de (HTTPS) via the dynamic ipsets, so the weekly pkgstats.timer submission stops failing, retrying and logging dns-egress-unmatched drops
@@ -62,6 +62,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `memory.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 - Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 ### Fixed
+- Dropped the `nanoclaw.lan` CNAME from `zones/lan.db`: the zone import only overwrites records of the same type, so the old `nanoclaw` A record stayed and Technitium rejected the CNAME ("a CNAME record cannot exists with other record types"), failing the `lan` import on every DNS server.
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).
 - Corrected `monitoring.lan` IP in `zones/lan.db` from `192.168.150.135` to `192.168.150.134`.
 - Egress ipset refresh no longer flaps on NAT64 spelling differences, and aborted update/refresh runs can no longer strand firewall runtime state behind permanent config
