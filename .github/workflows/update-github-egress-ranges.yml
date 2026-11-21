@@ -1,0 +1,77 @@
+---  # Refresh scripts/github-egress-ranges from GitHub's published address list and commit it to main when it changes
+name: "Repo: Update GitHub egress ranges"
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/update-github-egress-ranges.yml"
+      - "scripts/update-github-egress-ranges"
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{github.workflow}}-${{github.ref}}"
+  cancel-in-progress: false
+
+jobs:
+  update-github-egress-ranges:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: "Check Required Secrets"
+        shell: bash
+        run: |
+          if [ -z "${SOURCE_PUSH_TOKEN}" ]; then
+            echo "::error::SOURCE_PUSH_TOKEN is required but not set"
+            exit 1
+          fi
+        env:
+          SOURCE_PUSH_TOKEN: "${{secrets.SOURCE_PUSH_TOKEN}}"
+
+      - name: "Initialise Workspace"
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: sudo chown -R "$USER:$USER" "$GITHUB_WORKSPACE"
+
+      - name: "Checkout Source"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          fetch-depth: 1
+          token: "${{secrets.SOURCE_PUSH_TOKEN}}"
+          persist-credentials: true
+
+      - name: "Regenerate GitHub egress ranges"
+        shell: bash
+        run: |
+          OLD=$(grep -vc '^#' scripts/github-egress-ranges || true)
+          scripts/update-github-egress-ranges
+          NEW=$(grep -vc '^#' scripts/github-egress-ranges || true)
+          echo "Ranges: ${OLD} -> ${NEW}"
+          # Every DNS node applies this file as its GitHub egress allow-list,
+          # so a short or failed download must never replace a good list.
+          if [ "${NEW}" -lt 50 ] || [ "${NEW}" -lt $((OLD * 8 / 10)) ]; then
+            echo "::error::Only ${NEW} ranges (was ${OLD}); refusing to shrink the allow-list"
+            git checkout -- scripts/github-egress-ranges
+            exit 1
+          fi
+          git diff --stat -- scripts/github-egress-ranges
+
+      - name: "Commit changes to main"
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7.2.1
+        with:
+          commit_message: "[Actions] Updated scripts/github-egress-ranges from api.github.com/meta"
+          branch: "main"
+          file_pattern: "scripts/github-egress-ranges"
+          commit_user_name: "fun-version[bot]"
+          commit_user_email: "credfeto@users.noreply.github.com"
+          commit_author: "fun-version[bot] <credfeto@users.noreply.github.com>"
+          skip_dirty_check: false
