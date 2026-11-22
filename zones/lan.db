@@ -44,10 +44,10 @@ defi                IN A 192.168.150.12
 notifications       IN A 192.168.150.15
 dev-upgrader-01     IN A 192.168.150.20
 dev-upgrader-02     IN A 192.168.150.21
-credfeto.orchestrator     IN A 192.168.150.23
-credfeto.orchestrator     IN AAAA 2a02:8010:61d5:150::17
-funfair-tech.orchestrator IN A 192.168.150.24
-funfair-tech.orchestrator IN AAAA 2a02:8010:61d5:150::18
+credfeto.orchestrator     IN A 192.168.170.23
+credfeto.orchestrator     IN AAAA 2a02:8010:61d5:170::17
+funfair-tech.orchestrator IN A 192.168.170.24
+funfair-tech.orchestrator IN AAAA 2a02:8010:61d5:170::18
 memory              IN A 192.168.150.30
 trmnl               IN A 192.168.150.31
 oxidized            IN A 192.168.150.32

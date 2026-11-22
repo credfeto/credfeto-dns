@@ -16,7 +16,3 @@ $TTL 3600
 0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 01.proxy.markridgwell.com.
 ; 2a02:8010:61d5:150::251
 1.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR 02.proxy.markridgwell.com.
-; 2a02:8010:61d5:150::17
-7.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR credfeto.orchestrator.lan.
-; 2a02:8010:61d5:150::18
-8.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0 IN PTR funfair-tech.orchestrator.lan.
