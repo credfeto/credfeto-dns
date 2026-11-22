@@ -66,6 +66,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `memory.lan` (`192.168.150.30`) to `zones/lan.db` with a matching PTR record in `zones/150.168.192.in-addr.arpa.db` (#49)
 - Added `memory.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 - Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
+- DNS record for logs.markridgwell.com (VictoriaLogs and its MCP server, via Traefik) pointing to the proxies (192.168.150.250/.251 and their IPv6 addresses)
 ### Fixed
 - Corrected `xerox-b210-wired.lan` from the stale `192.168.86.156` to its Printers VLAN reservation `192.168.66.75`, moving its PTR from `zones/86.168.192.in-addr.arpa.db` to `zones/66.168.192.in-addr.arpa.db`.
 - `scripts/github-egress-ranges` regenerated from https://api.github.com/meta: adds `20.64.190.224/28`, `20.254.76.112/28`, `74.158.248.0/28` and `172.130.99.48/28`. github.com resolving into `20.254.76.112/28` was dropped as dns-egress-unmatched, so `sync-zones` git pulls timed out after ~134 s and failed (dns-01 05:17, dns-05 03:45 and 04:45).
