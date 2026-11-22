@@ -320,12 +320,12 @@ allow_egress ipv6 2a02:8010:61d5:150::251/128 tcp 443
 # Technitium's own "Query Logs (SQL Server)" app (sql-server.lan, Databases VLAN 13).
 allow_egress ipv4 192.168.130.254/32 tcp 1433
 
-# Central logging: VictoriaLogs HTTP ingest on monitoring.lan (journald via
+# Central logging: VictoriaLogs HTTP ingest on monitoring.lan (Monitoring VLAN 16, journald via
 # systemd-journal-upload, credfeto-setup-arch-vm#234). IPv4 only for now:
 # the monitoring stack publishes its ports on IPv4 only.
-allow_egress ipv4 192.168.150.134/32 tcp 9428
+allow_egress ipv4 192.168.160.134/32 tcp 9428
 # DNS query logs from the Log Exporter app (syslog over UDP).
-allow_egress ipv4 192.168.150.134/32 udp 514
+allow_egress ipv4 192.168.160.134/32 udp 514
 
 # Dynamic (CDN-fronted, no stable CIDR) destinations — ipsets kept fresh
 # by scripts/refresh-egress-ipsets, installed and run below. Names use

@@ -11,7 +11,7 @@
 		"enabled": false
 	},
 	"syslog": {
-		"address": "192.168.150.134",
+		"address": "192.168.160.134",
 		"port": 514,
 		"protocol": "UDP",
 		"enabled": true

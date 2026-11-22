@@ -53,7 +53,7 @@ trmnl               IN A 192.168.150.31
 oxidized            IN A 192.168.150.32
 linux-cache-01      IN A 192.168.150.200
 linux-cache-02      IN A 192.168.150.201
-monitoring          IN A 192.168.150.134
+monitoring          IN A 192.168.160.134
 development         IN A 192.168.150.176
 arch-vm-test        IN A 192.168.150.177
 proxy-01            IN A 192.168.150.250
