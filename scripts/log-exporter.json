@@ -1,0 +1,19 @@
+{
+	"maxQueueSize": 1000000,
+	"enableEdnsLogging": false,
+	"file": {
+		"path": "./dns_logs.json",
+		"enabled": false
+	},
+	"http": {
+		"endpoint": "http://localhost:5000/logs",
+		"headers": {},
+		"enabled": false
+	},
+	"syslog": {
+		"address": "192.168.150.134",
+		"port": 514,
+		"protocol": "UDP",
+		"enabled": true
+	}
+}
