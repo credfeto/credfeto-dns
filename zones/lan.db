@@ -38,6 +38,7 @@ proxmox-05          IN A 192.168.86.15
 proxmox-06          IN A 192.168.86.16
 xerox-b210-wired    IN A 192.168.86.156
 sql-server          IN A 192.168.130.254
+work                IN A 192.168.90.120
 defi                IN A 192.168.150.12
 notifications       IN A 192.168.150.15
 dev-upgrader-01     IN A 192.168.150.20
