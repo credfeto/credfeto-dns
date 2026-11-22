@@ -42,7 +42,7 @@ sql-server          IN A 192.168.130.254
 work                IN A 192.168.90.120
 defi                IN A 192.168.150.12
 notifications       IN A 192.168.150.15
-dev-upgrader-01     IN A 192.168.150.20
+dev-upgrader-01     IN A 192.168.180.20
 dev-upgrader-02     IN A 192.168.150.21
 credfeto.orchestrator     IN A 192.168.170.23
 credfeto.orchestrator     IN AAAA 2a02:8010:61d5:170::17

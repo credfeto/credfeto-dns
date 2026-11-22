@@ -9,4 +9,5 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
+20 IN PTR dev-upgrader-01.lan.
 176 IN PTR development.lan.
