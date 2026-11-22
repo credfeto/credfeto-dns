@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Egress allow-list: VictoriaLogs on monitoring.lan (`192.168.150.134:9428/tcp`), so the DNS hosts can forward their journal with systemd-journal-upload (credfeto/credfeto-setup-arch-vm#234)
 - DNS-over-TCP-PROXY on port 538 for DNS-over-TLS via the proxies (`dns.markridgwell.com`, terminated by Traefik with PROXY protocol v2): `scripts/sync-zones` enables it and trusts only the two proxies in `dnsReverseProxyNetworkACL`, and `./update` opens 538/tcp to the proxy addresses only (new `allow_port_from` helper).
 - Added `michelec320.lan` (`192.168.66.11`, the C320 printer's DHCP reservation on the Printers VLAN) to `zones/lan.db`, with its PTR in a new `zones/66.168.192.in-addr.arpa.db`.
 - Added `work.lan` (`192.168.90.120`, the work machine's DHCP reservation on the Work VLAN) to `zones/lan.db`, with its PTR in a recreated `zones/90.168.192.in-addr.arpa.db`.
