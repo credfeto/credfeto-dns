@@ -143,7 +143,7 @@ Zones are maintained as BIND-format `.db` files in `zones/`. Technitium writes i
 
 ```sh
 # Point a new subdomain at the proxy:
-cp zones/home.markridgwell.com.db zones/newservice.markridgwell.com.db
+cp zones/audiobookshelf.markridgwell.com.db zones/newservice.markridgwell.com.db
 # Edit the $ORIGIN line, commit, push — timer will import within 15 min.
 ```
 

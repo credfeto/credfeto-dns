@@ -24,7 +24,6 @@ $TTL 3600
 101 IN PTR dev-cache-02.lan.
 129 IN PTR familiar.lan.
 134 IN PTR monitoring.lan.
-150 IN PTR homepage.lan.
 154 IN PTR immich.lan.
 176 IN PTR development.lan.
 177 IN PTR arch-vm-test.lan.

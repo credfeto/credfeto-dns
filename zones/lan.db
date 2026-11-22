@@ -62,7 +62,6 @@ proxy-02            IN A 192.168.150.251
 proxy-02            IN AAAA 2a02:8010:61d5:150::251
 keys                IN A 192.168.150.220
 docker-registry     IN A 192.168.150.202
-homepage            IN A 192.168.150.150
 gickup              IN A 192.168.150.13
 audio-bookshelf     IN A 192.168.150.16
 dev-cache-01        IN A 192.168.150.100

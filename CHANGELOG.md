@@ -89,6 +89,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Watchtower now removes old images after each update (WATCHTOWER_CLEANUP=true) and its fixed poll interval is replaced by an overridable 6-field cron WATCHTOWER_SCHEDULE, defaulting to hourly at minute 12 (set in .env)
 ### Deprecated
 ### Removed
+- Removed `homepage.lan` (`192.168.150.150`) and its PTR, and the `home.markridgwell.com` zone: the homepage VM (105) is retired and the hostname is no longer routed by the proxies. The zone has to be deleted from each DNS server by hand (sync-zones only reports removed zones).
 - Removed the obsolete AdGuard Home `certs/` folder (`adguard.local.crt`, `.key` and `.pem`), which nothing referenced (#46)
 ### Deployment Changes
 
