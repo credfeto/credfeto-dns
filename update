@@ -42,6 +42,24 @@ allow_port() {
     done
 }
 
+# Allow a port only from specific hosts (single addresses, IPv4 or IPv6).
+allow_port_from() {
+    PROTO="$1"
+    PORT="$2"
+    shift 2
+    for ADDR in "$@"; do
+        case "${ADDR}" in
+            *:*) FAMILY=ipv6 ;;
+            *) FAMILY=ipv4 ;;
+        esac
+        RULE="rule family=\"${FAMILY}\" source address=\"${ADDR}\" port protocol=\"${PROTO}\" port=\"${PORT}\" accept"
+        if ! sudo firewall-cmd --query-rich-rule="${RULE}" --permanent > /dev/null 2>&1; then
+            sudo firewall-cmd --permanent --add-rich-rule="${RULE}" || die "Failed to add firewall rule: ${RULE}"
+            FIREWALL_CHANGED=true
+        fi
+    done
+}
+
 block_port() {
     PROTO="$1"
     PORT="$2"
@@ -215,6 +233,12 @@ allow_port udp 53
 # DNS-over-HTTPS
 allow_port tcp 443
 allow_port udp 443
+
+# DNS-over-TCP-PROXY (538): DNS-over-TLS for dns.markridgwell.com is terminated
+# by Traefik on the proxies, which forward here with PROXY protocol v2. Only
+# the proxies may connect (they are also the only trusted reverse proxies in
+# dnsReverseProxyNetworkACL, set by scripts/sync-zones).
+allow_port_from tcp 538 192.168.150.250 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251
 
 # Explicitly block DHCP — Technitium includes a DHCP server but it should
 # never serve on this host; reject at the firewall regardless of app config.

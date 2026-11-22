@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- DNS-over-TCP-PROXY on port 538 for DNS-over-TLS via the proxies (`dns.markridgwell.com`, terminated by Traefik with PROXY protocol v2): `scripts/sync-zones` enables it and trusts only the two proxies in `dnsReverseProxyNetworkACL`, and `./update` opens 538/tcp to the proxy addresses only (new `allow_port_from` helper).
 - Added `michelec320.lan` (`192.168.66.11`, the C320 printer's DHCP reservation on the Printers VLAN) to `zones/lan.db`, with its PTR in a new `zones/66.168.192.in-addr.arpa.db`.
 - Added `work.lan` (`192.168.90.120`, the work machine's DHCP reservation on the Work VLAN) to `zones/lan.db`, with its PTR in a recreated `zones/90.168.192.in-addr.arpa.db`.
 - Daily `Repo: Update GitHub egress ranges` workflow: regenerates `scripts/github-egress-ranges` from https://api.github.com/meta and commits it to main when GitHub publishes new ranges, so the DNS nodes pick them up on the next zone sync. It refuses to commit a list under 50 ranges or more than 20% shorter than the current one.
