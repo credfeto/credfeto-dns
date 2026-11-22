@@ -80,6 +80,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Corrected the reverse DNS (PTR) record for `192.168.10.1` in `zones/10.168.192.in-addr.arpa.db` to point at `opnsense.network.lan` instead of `firewall.lan` (#46)
 - Added missing reverse DNS zone `zones/2.168.192.in-addr.arpa.db` for `192.168.2.0/24` with PTR records for `stairs-01` (`192.168.2.2`), `stairs-02` (`192.168.2.3`), `office` (`192.168.2.4`) and `bedroom` (`192.168.2.5`) (#46)
 ### Changed
+- linux-cache-01.lan and linux-cache-02.lan moved to the new LinuxCaches VLAN 21: A `192.168.210.200` / `192.168.210.201` (were 192.168.150.200/201), PTRs in the new `zones/210.168.192.in-addr.arpa.db`
 - dev-cache-01.lan and dev-cache-02.lan moved to the new Caches VLAN 20: A `192.168.200.100` / `192.168.200.101` (were 192.168.150.100/101), PTRs in the new `zones/200.168.192.in-addr.arpa.db`
 - familiar.lan moved to the new Familiar VLAN 19: A `192.168.190.129` (was `192.168.150.129`), PTR in the new `zones/190.168.192.in-addr.arpa.db`
 - dev-upgrader-01.lan moved to the Development VLAN 18: A `192.168.180.20` (was `192.168.150.20`), PTR in `zones/180.168.192.in-addr.arpa.db`. dev-upgrader-02 stays on 192.168.150.21 until it is next powered on and moved

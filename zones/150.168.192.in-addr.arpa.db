@@ -19,8 +19,6 @@ $TTL 3600
 32  IN PTR oxidized.lan.
 154 IN PTR immich.lan.
 177 IN PTR arch-vm-test.lan.
-200 IN PTR linux-cache-01.lan.
-201 IN PTR linux-cache-02.lan.
 202 IN PTR docker-registry.lan.
 220 IN PTR keys.lan.
 

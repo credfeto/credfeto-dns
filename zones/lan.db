@@ -51,8 +51,8 @@ funfair-tech.orchestrator IN AAAA 2a02:8010:61d5:170::18
 memory              IN A 192.168.150.30
 trmnl               IN A 192.168.150.31
 oxidized            IN A 192.168.150.32
-linux-cache-01      IN A 192.168.150.200
-linux-cache-02      IN A 192.168.150.201
+linux-cache-01      IN A 192.168.210.200
+linux-cache-02      IN A 192.168.210.201
 monitoring          IN A 192.168.160.134
 development         IN A 192.168.180.176
 arch-vm-test        IN A 192.168.150.177
