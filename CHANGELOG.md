@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Added `michelec320.lan` (`192.168.66.11`, the C320 printer's DHCP reservation on the Printers VLAN) to `zones/lan.db`, with its PTR in a new `zones/66.168.192.in-addr.arpa.db`.
 - Added `work.lan` (`192.168.90.120`, the work machine's DHCP reservation on the Work VLAN) to `zones/lan.db`, with its PTR in a recreated `zones/90.168.192.in-addr.arpa.db`.
 - Daily `Repo: Update GitHub egress ranges` workflow: regenerates `scripts/github-egress-ranges` from https://api.github.com/meta and commits it to main when GitHub publishes new ranges, so the DNS nodes pick them up on the next zone sync. It refuses to commit a list under 50 ranges or more than 20% shorter than the current one.
 - `credfeto.orchestrator.lan` (`192.168.150.23`, `2a02:8010:61d5:150::17`) and `funfair-tech.orchestrator.lan` (`192.168.150.24`, `2a02:8010:61d5:150::18`) in `zones/lan.db` with IPv4 and IPv6 PTRs, for the orchestrator split into one VM per owner.
@@ -64,6 +65,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `memory.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 - Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 ### Fixed
+- Corrected `xerox-b210-wired.lan` from the stale `192.168.86.156` to its Printers VLAN reservation `192.168.66.75`, moving its PTR from `zones/86.168.192.in-addr.arpa.db` to `zones/66.168.192.in-addr.arpa.db`.
 - `scripts/github-egress-ranges` regenerated from https://api.github.com/meta: adds `20.64.190.224/28`, `20.254.76.112/28`, `74.158.248.0/28` and `172.130.99.48/28`. github.com resolving into `20.254.76.112/28` was dropped as dns-egress-unmatched, so `sync-zones` git pulls timed out after ~134 s and failed (dns-01 05:17, dns-05 03:45 and 04:45).
 - Dropped the `nanoclaw.lan` CNAME from `zones/lan.db`: the zone import only overwrites records of the same type, so the old `nanoclaw` A record stayed and Technitium rejected the CNAME ("a CNAME record cannot exists with other record types"), failing the `lan` import on every DNS server.
 - Fixed typo in `zones/lan.db`: `docker-tegistry` renamed to `docker-registry` (`192.168.150.202`).

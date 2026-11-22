@@ -15,4 +15,3 @@ $TTL 3600
 14  IN PTR proxmox-04.lan.
 15  IN PTR proxmox-05.lan.
 16  IN PTR proxmox-06.lan.
-156 IN PTR xerox-b210-wired.lan.
