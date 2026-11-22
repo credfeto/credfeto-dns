@@ -80,6 +80,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Corrected the reverse DNS (PTR) record for `192.168.10.1` in `zones/10.168.192.in-addr.arpa.db` to point at `opnsense.network.lan` instead of `firewall.lan` (#46)
 - Added missing reverse DNS zone `zones/2.168.192.in-addr.arpa.db` for `192.168.2.0/24` with PTR records for `stairs-01` (`192.168.2.2`), `stairs-02` (`192.168.2.3`), `office` (`192.168.2.4`) and `bedroom` (`192.168.2.5`) (#46)
 ### Changed
+- familiar.lan moved to the new Familiar VLAN 19: A `192.168.190.129` (was `192.168.150.129`), PTR in the new `zones/190.168.192.in-addr.arpa.db`
 - dev-upgrader-01.lan moved to the Development VLAN 18: A `192.168.180.20` (was `192.168.150.20`), PTR in `zones/180.168.192.in-addr.arpa.db`. dev-upgrader-02 stays on 192.168.150.21 until it is next powered on and moved
 - development.lan moved to the new Development VLAN 18: A `192.168.180.176` (was `192.168.150.176` on the Servers VLAN); its PTR moves to the new `zones/180.168.192.in-addr.arpa.db`
 - credfeto.orchestrator.lan and funfair-tech.orchestrator.lan moved to the new Orchestrators VLAN 17: A `192.168.170.23` / `192.168.170.24`, AAAA `2a02:8010:61d5:170::17` / `::18` (were 192.168.150.x and 2a02:8010:61d5:150::x on the Servers VLAN); their PTRs move to the new `zones/170.168.192.in-addr.arpa.db` and `zones/0.7.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db`
