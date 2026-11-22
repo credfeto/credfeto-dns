@@ -293,8 +293,8 @@ allow_egress ipv4 192.168.150.251/32 tcp 443
 allow_egress ipv6 2a02:8010:61d5:150::250/128 tcp 443
 allow_egress ipv6 2a02:8010:61d5:150::251/128 tcp 443
 
-# Technitium's own "Query Logs (SQL Server)" app.
-allow_egress ipv4 192.168.90.254/32 tcp 1433
+# Technitium's own "Query Logs (SQL Server)" app (sql-server.lan, Databases VLAN 13).
+allow_egress ipv4 192.168.130.254/32 tcp 1433
 
 # Dynamic (CDN-fronted, no stable CIDR) destinations — ipsets kept fresh
 # by scripts/refresh-egress-ipsets, installed and run below. Names use

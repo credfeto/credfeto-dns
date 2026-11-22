@@ -155,7 +155,7 @@ it's an existing inbound NAT redirect on the firewall, unrelated to what
 the DNS servers themselves need outbound.
 
 Also observed: every DNS node has an established TCP session to
-`192.168.90.254:1433` (MSSQL) — that's cross-VLAN, not internet egress, but
+`192.168.130.254:1433` (MSSQL) — that's cross-VLAN, not internet egress, but
 still needs an explicit firewall allow if OPNsense enforces inter-VLAN
 rules too. **Confirmed via the API**: Technitium's "Query Logs (SQL
 Server)" app is installed (`/api/apps/list` on dns-01) — this is it, not
@@ -217,7 +217,7 @@ locked down to only accept from the DNS VLAN.
    it pulls through the Docker daemon's `registry-mirrors` setting
    (`docker-cache.markridgwell.com` -> `192.168.150.250`, internal), so it
    never needs direct Docker Hub egress. No public range needed after all.
-6. ~~What is `192.168.90.254:1433` (MSSQL) for?~~ **Resolved:** Technitium's
+6. ~~What is `192.168.130.254:1433` (MSSQL) for?~~ **Resolved:** Technitium's
    own "Query Logs (SQL Server)" app, confirmed installed via the API.
    Still open: does it need to stay reachable from every node, or should
    logging be consolidated?
@@ -446,7 +446,7 @@ allow_egress_ipv4 "192.168.150.250/32" 443 tcp
 allow_egress_ipv4 "192.168.150.251/32" 443 tcp
 
 # --- Confirmed: Technitium's own MSSQL query-logging app ---
-allow_egress_ipv4 "192.168.90.254/32" 1433 tcp
+allow_egress_ipv4 "192.168.130.254/32" 1433 tcp
 
 # --- NOT YET RESOLVED, blocks going live - see open questions 9-11 ---
 # github.com, cdn-mirror.chaotic.cx: no static rule works (CDN/Cloudflare

@@ -73,6 +73,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Corrected the reverse DNS (PTR) record for `192.168.10.1` in `zones/10.168.192.in-addr.arpa.db` to point at `opnsense.network.lan` instead of `firewall.lan` (#46)
 - Added missing reverse DNS zone `zones/2.168.192.in-addr.arpa.db` for `192.168.2.0/24` with PTR records for `stairs-01` (`192.168.2.2`), `stairs-02` (`192.168.2.3`), `office` (`192.168.2.4`) and `bedroom` (`192.168.2.5`) (#46)
 ### Changed
+- Moved `sql-server.lan` to the new Databases VLAN 13: A record `192.168.130.254` (was `192.168.90.254` on the Work VLAN), its PTR moves from `zones/90.168.192.in-addr.arpa.db` to the new `zones/130.168.192.in-addr.arpa.db`, and the DNS egress allow-list rule for Technitium's Query Logs (SQL Server) app now targets `192.168.130.254:1433`. The old `90.168.192.in-addr.arpa` zone has to be deleted from each DNS server by hand (sync-zones only reports removed zones).
 - Removed the legacy repository `hosts` file workflow; zone files in `zones/` are now the source of truth.
 - Widened the allowed IPv6 firewall network from 2a02:8010:61d5::/64 to 2a02:8010:61d5::/48 to cover all subnets, not just subnet 0
 - Switched Technitium recursion ACL from AllowOnlyForPrivateNetworks to an explicit network ACL including 2a02:8010:61d5::/48, since public IPv6 addresses are never classified as private
