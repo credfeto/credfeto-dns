@@ -1,7 +1,7 @@
 $ORIGIN dns-01.markridgwell.com.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    5       ; serial
+    7       ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -9,7 +9,7 @@ $TTL 3600
 )
 @ IN NS dns-server.
 
-@ IN A 192.168.150.250
+@ IN A 192.168.140.250
 @ IN A 192.168.140.251
-@ IN AAAA 2a02:8010:61d5:150::250
+@ IN AAAA 2a02:8010:61d5:140::250
 @ IN AAAA 2a02:8010:61d5:140::251

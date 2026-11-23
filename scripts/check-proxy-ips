@@ -82,7 +82,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $# -eq 0 ]; then
-    set -- 192.168.150.250 192.168.140.251 2a02:8010:61d5:150::250 2a02:8010:61d5:140::251
+    set -- 192.168.140.250 192.168.140.251 2a02:8010:61d5:140::250 2a02:8010:61d5:140::251
 fi
 
 [ -d "${ZONES_DIR}" ] || die "check-proxy-ips: zones directory '${ZONES_DIR}' does not exist."
