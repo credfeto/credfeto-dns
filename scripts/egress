@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""Builds and loads the DNS server's egress firewall as one nftables table.
+
+The table is `inet dns_egress`, with one base chain:
+  host_out    hook output:  what the host itself may connect to.
+
+Technitium runs in Docker with host networking, so its recursion, forwarding,
+blocklist downloads and log shipping all leave through host_out. Watchtower is
+the only container on a Docker bridge; its forwarded traffic is not filtered
+here.
+
+It is a table of its own, not firewalld policies: the whole ruleset, including
+the address sets, is replaced in a single `nft -f` transaction. So a refresh
+never makes firewalld reload, and a failed load leaves the previous rules in
+place. firewalld keeps the base zones (the inbound DNS, DoH and admin rules
+that ../update adds) and never sees this table.
+
+Runs as root from dns-egress-refresh.service (at boot, before Docker starts,
+and every 10 minutes from dns-egress-refresh.timer), from ../update and from
+scripts/sync-zones before every pull. Each run:
+  * resolves the CDN-fronted names (falling back to the last good answer for
+    a name that does not resolve right now),
+  * reads the published GitHub ranges,
+  * renders the table and loads it only if it differs from what is loaded.
+
+Enforcement comes from ENFORCE_FILE, which ../update writes from
+DNS_EGRESS_ENFORCE in ../.env: anything other than "false" (including a
+missing file) drops unmatched new connections; "false" only logs them
+("dns-egress-unmatched: ", 30 a minute) and lets them through.
+"""
+
+import ipaddress
+import json
+import os
+import socket
+import subprocess
+import sys
+import tempfile
+
+TABLE = "dns_egress"
+PREFIX = "dns-egress"
+STATE_DIR = "/var/lib/credfeto-adguard-home"
+ENFORCE_FILE = os.path.join(STATE_DIR, "egress-enforce")
+CACHE_FILE = os.path.join(STATE_DIR, "egress-resolved.json")
+LOADED_FILE = os.path.join(STATE_DIR, "egress.nft")
+RANGES_DIR = "/usr/local/share/credfeto-adguard-home"
+
+# The reverse proxies (proxy-01/proxy-02, DMZ VLAN): the internal package,
+# registry and Docker Hub caches (pacman, aur, dotnet, npm, api-nuget,
+# docker-cache, docker-registry). The DNS records round-robin both.
+PROXIES = ["192.168.140.250", "192.168.140.251", "2a02:8010:61d5:140::250", "2a02:8010:61d5:140::251"]
+# download.technitium.com: Technitium's update check and DNS-app downloads.
+TECHNITIUM = ["206.189.140.177", "2400:6180:100:d0::b3c:c001"]
+# NextDNS (be6f94), the sole forwarder, over DoH. The IPv6 addresses are
+# steering.nextdns.io's AAAA answers (dns.nextdns.io is a CNAME to it).
+NEXTDNS = ["45.90.28.0/24", "45.90.30.0/24", "2a0f:3b03:100:2:5054:ff:fe90:4a77", "2a00:11c0:8:4::9"]
+# abp.markridgwell.com blocklists (a CNAME to credfeto.github.io): GitHub
+# Pages' Fastly range.
+FASTLY = ["185.199.108.0/22", "2606:50c0::/32"]
+# NTP via OPNsense, not the public pool.
+NTP = ["192.168.42.1"]
+# Technitium's "Query Logs (SQL Server)" app (sql-server.lan).
+SQL = ["192.168.130.254"]
+# monitoring.lan: VictoriaLogs HTTP ingest (journald via
+# systemd-journal-upload) on 9428/tcp, and the Log Exporter app's DNS query
+# logs as syslog on 514/udp. IPv4 only: the monitoring stack publishes its
+# ports on IPv4 only.
+LOGS = ["192.168.160.134"]
+
+# Names without a stable address, resolved on every run. slug -> name.
+DOMAINS = {
+    "github": "github.com",
+    "chaotic": "cdn-mirror.chaotic.cx",
+    "pkgstats": "pkgstats.archlinux.de",
+    "archwkd": "openpgpkey.archlinux.org",
+}
+# Published ranges, shipped in the repo and regenerated daily by the
+# "Repo: Update GitHub egress ranges" workflow. slug -> file in RANGES_DIR.
+RANGES = {
+    "ghnet": "github-egress-ranges",
+}
+
+HTTPS_SETS = ["github", "ghnet", "chaotic", "pkgstats", "archwkd"]
+
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
+def log(msg):
+    print(f"egress: {msg}", file=sys.stderr)
+
+
+def nat64(v4net):
+    """The NAT64 (RFC 6052 well-known prefix) form of an IPv4 network: this
+    network runs DNS64, so IPv6-preferring clients reach IPv4-only hosts that
+    way."""
+    base = int(NAT64.network_address) + int(v4net.network_address)
+    return ipaddress.ip_network((base, 96 + v4net.prefixlen))
+
+
+def split(nets):
+    """IPv4 and IPv6 networks, the IPv6 side including the NAT64 form of every
+    IPv4 network, each collapsed so overlapping entries cannot make nft reject
+    the set."""
+    v4 = [n for n in nets if n.version == 4]
+    v6 = [n for n in nets if n.version == 6 and n not in NAT64 and not n.subnet_of(NAT64)]
+    v6 += [nat64(n) for n in v4]
+    return list(ipaddress.collapse_addresses(v4)), list(ipaddress.collapse_addresses(v6))
+
+
+def resolve(name):
+    infos = socket.getaddrinfo(name, 443, proto=socket.IPPROTO_TCP)
+    return sorted({info[4][0] for info in infos})
+
+
+def load_cache():
+    try:
+        with open(CACHE_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def read_ranges(path):
+    nets = []
+    with open(path) as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                nets.append(ipaddress.ip_network(line, strict=False))
+    return nets
+
+
+def gather_sets():
+    """slug -> (v4 networks, v6 networks)."""
+    cache = load_cache()
+    resolved = {}
+    sets = {}
+    for slug, name in DOMAINS.items():
+        try:
+            addrs = resolve(name)
+        except OSError as e:
+            addrs = cache.get(slug, [])
+            log(f"{name} did not resolve ({e}); keeping the {len(addrs)} cached address(es)")
+        resolved[slug] = addrs
+        # Resolver-supplied 64:ff9b:: answers are dropped by split() and
+        # recomputed from the IPv4 answers, so DNS64 state cannot make the
+        # sets flap between runs.
+        sets[slug] = split([ipaddress.ip_network(a) for a in addrs])
+    for slug, filename in RANGES.items():
+        path = os.path.join(RANGES_DIR, filename)
+        try:
+            sets[slug] = split(read_ranges(path))
+        except OSError as e:
+            log(f"{path} unreadable ({e}); {slug} is empty")
+            sets[slug] = ([], [])
+    os.makedirs(STATE_DIR, exist_ok=True)
+    tmp = CACHE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(resolved, f, indent=1, sort_keys=True)
+    os.replace(tmp, CACHE_FILE)
+    return sets
+
+def addr_rules(addrs, match):
+    """One rule per family for a static list of addresses or networks."""
+    nets = [ipaddress.ip_network(a, strict=False) for a in addrs]
+    rules = []
+    for fam, kw in ((4, "ip"), (6, "ip6")):
+        fam_nets = [str(n) for n in nets if n.version == fam]
+        if fam_nets:
+            rules.append(f"{kw} daddr {{ {', '.join(fam_nets)} }} {match} accept")
+    return rules
+
+
+def set_rules(slugs, sets, match):
+    rules = []
+    for slug in slugs:
+        v4, v6 = sets[slug]
+        if v4:
+            rules.append(f"ip daddr @{slug}_v4 {match} accept")
+        if v6:
+            rules.append(f"ip6 daddr @{slug}_v6 {match} accept")
+    return rules
+
+
+def chain(name, hook, pre, allows, log_prefix, enforce):
+    lines = [
+        f"\tchain {name} {{",
+        f"\t\ttype filter hook {hook} priority filter - 10; policy accept;",
+        # Replies to accepted connections, including inbound SSH and anything
+        # the host's zones let in.
+        "\t\tct state established,related accept",
+        "\t\tct state invalid drop" if enforce else "",
+    ]
+    lines += [f"\t\t{r}" for r in pre + allows]
+    lines.append(f'\t\tlimit rate 30/minute log prefix "{log_prefix}: " level info')
+    if enforce:
+        lines.append("\t\tdrop")
+    lines.append("\t}")
+    return [l for l in lines if l]
+
+
+def render(sets, enforce):
+    out = [f"table inet {TABLE}", f"delete table inet {TABLE}", f"table inet {TABLE} {{"]
+    for slug, (v4, v6) in sorted(sets.items()):
+        for suffix, kind, nets in (("v4", "ipv4_addr", v4), ("v6", "ipv6_addr", v6)):
+            if not nets:
+                continue
+            out.append(f"\tset {slug}_{suffix} {{")
+            out.append(f"\t\ttype {kind}; flags interval;")
+            out.append(f"\t\telements = {{ {', '.join(str(n) for n in nets)} }}")
+            out.append("\t}")
+
+    host_allows = [
+        # ICMPv6 is fundamental (NDP, PMTU discovery); IGMP is link-local
+        # multicast housekeeping from the Docker bridges; DHCPv6 is address
+        # configuration via the relay/server multicast address.
+        "meta l4proto ipv6-icmp accept",
+        "meta l4proto igmp accept",
+        "ip6 daddr ff02::1:2 udp dport 547 accept",
+        # Outbound DNS to any destination: this server resolves iteratively
+        # (root, TLD, authoritative), so its port-53 destinations are the whole
+        # internet's DNS infrastructure and cannot be listed. Also covers
+        # DNS-to-DNS traffic between the six nodes and NextDNS's plain-DNS
+        # bootstrap. Everything except DNS stays locked down.
+        "meta l4proto { tcp, udp } th dport 53 accept",
+    ]
+    host_allows += addr_rules(NTP, "udp dport 123")
+    host_allows += addr_rules(PROXIES + TECHNITIUM + NEXTDNS + FASTLY, "tcp dport 443")
+    host_allows += addr_rules(SQL, "tcp dport 1433")
+    host_allows += addr_rules(LOGS, "tcp dport 9428")
+    host_allows += addr_rules(LOGS, "udp dport 514")
+    host_allows += set_rules(HTTPS_SETS, sets, "tcp dport 443")
+    out += chain("host_out", "output", ['oifname "lo" accept'], host_allows, f"{PREFIX}-unmatched", enforce)
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def loaded():
+    try:
+        with open(LOADED_FILE) as f:
+            text = f.read()
+    except OSError:
+        return None
+    # The table can be gone even though the file is current (after a reboot,
+    # or someone flushing the ruleset).
+    if subprocess.run(["nft", "list", "table", "inet", TABLE], capture_output=True).returncode != 0:
+        return None
+    return text
+
+
+def main():
+    if os.geteuid() != 0:
+        sys.exit("egress: must run as root")
+    # Fail closed: only an explicit "false" means observation mode.
+    try:
+        with open(ENFORCE_FILE) as f:
+            enforce = f.read().strip() != "false"
+    except OSError:
+        enforce = True
+    text = render(gather_sets(), enforce)
+    if text == loaded():
+        return
+    fd, path = tempfile.mkstemp(dir=STATE_DIR, suffix=".nft")
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    # Check first, so a bad ruleset never touches the loaded one; the load
+    # itself is one transaction as well.
+    check = subprocess.run(["nft", "-c", "-f", path], capture_output=True, text=True)
+    if check.returncode != 0:
+        os.unlink(path)
+        sys.exit(f"egress: ruleset rejected, previous one left in place:\n{check.stderr}")
+    load = subprocess.run(["nft", "-f", path], capture_output=True, text=True)
+    if load.returncode != 0:
+        os.unlink(path)
+        sys.exit(f"egress: load failed, previous ruleset left in place:\n{load.stderr}")
+    os.replace(path, LOADED_FILE)
+    log(f"loaded table inet {TABLE} ({'enforcing' if enforce else 'observation mode'})")
+
+
+if __name__ == "__main__":
+    main()

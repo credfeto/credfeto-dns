@@ -1,9 +1,15 @@
 [Unit]
-Description=Refresh dynamic DNS-egress firewalld ipsets (github.com, cdn-mirror.chaotic.cx)
+Description=Refresh and load the DNS server's egress nftables table
+Wants=network-online.target
+After=network-online.target firewalld.service
+# Loaded at boot before Docker starts Technitium, so its traffic is never
+# unfiltered. A failed or slow run does not stop Docker: Before= only orders.
+Before=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/refresh-egress-ipsets
+ExecStart=/usr/local/bin/dns-egress
+TimeoutStartSec=2min
 ProtectSystem=full
 ProtectHome=true
 NoNewPrivileges=true
@@ -12,3 +18,6 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

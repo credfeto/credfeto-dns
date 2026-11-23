@@ -7,7 +7,7 @@ die() {
 }
 
 # FIREWALL_CHANGED tracks whether any permanent firewall config
-# (inbound zone rules or the egress policy) was touched, so the final
+# (inbound zone rules, or retiring the old firewalld egress policy) was
 # reload can be skipped on idempotent re-runs. The reload runs from
 # traps so that a die() or an interrupt (Ctrl-C, dropped ssh) after
 # permanent config was mutated still activates it - otherwise runtime
@@ -73,82 +73,6 @@ block_port() {
 env_value() {
     grep -E "^[[:space:]]*$1[[:space:]]*=" "${ENV_FILE}" | tail -n 1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
-
-# Deny-by-default outbound policy. The policy TARGET is the one
-# enforcement knob: DROP (enforce) unless DNS_EGRESS_ENFORCE is exactly
-# "false" (observation - every rule present but unmatched egress
-# passes). Fail closed: an unset value or a typo means enforce. See
-# docs/network/egress-whitelist.md for the destination list.
-ensure_egress_policy() {
-    if ! sudo firewall-cmd --permanent --info-policy=dns-egress > /dev/null 2>&1; then
-        sudo firewall-cmd --permanent --new-policy=dns-egress || die "Failed to create dns-egress policy"
-        sudo firewall-cmd --permanent --policy=dns-egress --add-ingress-zone=HOST || die "Failed to set dns-egress ingress zone"
-        sudo firewall-cmd --permanent --policy=dns-egress --add-egress-zone=ANY || die "Failed to set dns-egress egress zone"
-        FIREWALL_CHANGED=true
-    fi
-    TARGET="DROP"
-    if [ "${DNS_EGRESS_ENFORCE}" = "false" ]; then
-        TARGET="ACCEPT"
-    fi
-    CURRENT_TARGET="$(sudo firewall-cmd --permanent --policy=dns-egress --get-target)"
-    if [ "${CURRENT_TARGET}" != "${TARGET}" ]; then
-        sudo firewall-cmd --permanent --policy=dns-egress --set-target="${TARGET}" || die "Failed to set dns-egress target"
-        FIREWALL_CHANGED=true
-    fi
-}
-
-# Shared idempotent core: add a rich rule to the dns-egress policy if it
-# is not already present.
-ensure_egress_rule() {
-    RULE="$1"
-    if ! sudo firewall-cmd --policy=dns-egress --query-rich-rule="${RULE}" --permanent > /dev/null 2>&1; then
-        sudo firewall-cmd --permanent --policy=dns-egress --add-rich-rule="${RULE}" || die "Failed to add egress rule: ${RULE}"
-        FIREWALL_CHANGED=true
-    fi
-}
-
-# Remove a rich rule from the dns-egress policy if present (used to
-# retire superseded rule shapes on already-deployed nodes).
-retire_egress_rule() {
-    RULE="$1"
-    if sudo firewall-cmd --policy=dns-egress --query-rich-rule="${RULE}" --permanent > /dev/null 2>&1; then
-        sudo firewall-cmd --permanent --policy=dns-egress --remove-rich-rule="${RULE}" || die "Failed to remove egress rule: ${RULE}"
-        FIREWALL_CHANGED=true
-    fi
-}
-
-allow_egress() {
-    ensure_egress_rule "rule family=\"$1\" destination address=\"$2\" port protocol=\"$3\" port=\"$4\" accept"
-}
-
-# Any-destination, port-scoped egress allowance - reserve for traffic
-# classes whose legitimate destinations are inherently not enumerable
-# (outbound DNS from a recursive resolver).
-allow_egress_port() {
-    ensure_egress_rule "rule family=\"$1\" port protocol=\"$2\" port=\"$3\" accept"
-}
-
-allow_egress_ipset() {
-    ensure_egress_rule "rule family=\"$1\" destination ipset=\"$2\" port protocol=\"$3\" port=\"$4\" accept"
-}
-
-# Ipsets for the dynamic (CDN-fronted, no stable CIDR) destinations -
-# created empty here; scripts/refresh-egress-ipsets populates and
-# maintains their actual entries. EXISTING_IPSETS is fetched once by the
-# caller before the first ensure_ipset call.
-IPSET_CREATED=false
-ensure_ipset() {
-    NAME="$1"
-    FAMILY="$2"
-    TYPE="${3:-hash:ip}"
-    if ! printf '%s' "${EXISTING_IPSETS}" | grep -qw "${NAME}"; then
-        sudo firewall-cmd --permanent --new-ipset="${NAME}" --type="${TYPE}" --option=family="${FAMILY}" || die "Failed to create ipset ${NAME}"
-        IPSET_CREATED=true
-        FIREWALL_CHANGED=true
-    fi
-}
-
-
 
 BASEDIR="$(dirname "$(readlink -f "$0")")"
 
@@ -223,6 +147,46 @@ if [ "${CERT_GENERATED}" = "true" ]; then
 fi
 
 
+## Outbound (egress) lockdown: one nftables table, inet dns_egress, built
+## and loaded by scripts/egress (installed as /usr/local/bin/dns-egress);
+## see there and docs/network/egress-whitelist.md for the destination
+## list. It is loaded and verified here, before any firewalld change, and
+## the firewalld egress policy it replaces is only retired once it is in
+## place (below), so egress is never unfiltered and never fully blocked.
+## Enforcement (unmatched new connections dropped) is the default;
+## DNS_EGRESS_ENFORCE=false gives observation mode (logged, not dropped).
+# Keep the state directory in sync with scripts/egress.
+EGRESS_STATE_DIR="/var/lib/credfeto-adguard-home"
+EGRESS_ENFORCE="true"
+if [ "${DNS_EGRESS_ENFORCE}" = "false" ]; then
+    EGRESS_ENFORCE="false"
+fi
+sudo install -m 755 "${BASEDIR}/scripts/egress" /usr/local/bin/dns-egress || die "Failed to install dns-egress"
+sudo install -d -m 755 /usr/local/share/credfeto-adguard-home
+sudo install -m 644 "${BASEDIR}/scripts/github-egress-ranges" /usr/local/share/credfeto-adguard-home/github-egress-ranges \
+    || die "Failed to install github-egress-ranges"
+sudo install -d -m 755 "${EGRESS_STATE_DIR}"
+printf '%s\n' "${EGRESS_ENFORCE}" | sudo tee "${EGRESS_STATE_DIR}/egress-enforce" > /dev/null \
+    || die "Could not write ${EGRESS_STATE_DIR}/egress-enforce"
+sudo /usr/local/bin/dns-egress || die "Failed to load the egress table; the previous egress rules are unchanged"
+sudo nft list table inet dns_egress > /dev/null 2>&1 || die "Table inet dns_egress is not loaded; the previous egress rules are unchanged"
+
+# The refresh unit runs dns-egress at boot (before Docker starts) and every
+# 10 minutes from its timer. Let a refresh that is already running finish
+# before its unit is replaced.
+for _ in $(seq 1 120); do
+    [ "$(systemctl show -p ActiveState --value dns-egress-refresh.service 2> /dev/null)" = "activating" ] || break
+    sleep 1
+done
+sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.service" /etc/systemd/system/dns-egress-refresh.service
+sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.timer" /etc/systemd/system/dns-egress-refresh.timer
+sudo rm -f /usr/local/bin/refresh-egress-ipsets
+sudo systemctl daemon-reload
+sudo systemctl enable dns-egress-refresh.service dns-egress-refresh.timer > /dev/null 2>&1
+# restart, not just enable --now: an already-active timer would keep its
+# old (possibly stalled) schedule instead of picking up the new unit.
+sudo systemctl restart dns-egress-refresh.timer
+
 ## Admin UI (HTTPS web console)
 allow_port tcp 53443
 
@@ -257,157 +221,35 @@ done
 block_port udp 67
 block_port udp 68
 
-## Outbound (egress) lockdown — see docs/network/egress-whitelist.md for
-## the destination list and rationale. Enforcement (policy target DROP)
-## is the default; DNS_EGRESS_ENFORCE=false gives observation mode.
-ensure_egress_policy
-
-# All ICMPv6 — NDP (the IPv6 equivalent of ARP) is fundamental link
-# operation; dropping it breaks IPv6 networking entirely, and narrowly
-# filtering ICMPv6 subtypes is a known anti-pattern (breaks PMTU
-# discovery etc.). Found live via the dns-06 logging catch-all.
-ensure_egress_rule 'rule family="ipv6" protocol value="ipv6-icmp" accept'
-
-# DHCPv6 client (address configuration) to the DHCP relay/server
-# multicast address. Found live via the dns-06 logging catch-all.
-allow_egress ipv6 ff02::1:2/128 udp 547
-
-# IGMP - link-local multicast group housekeeping (TTL=1, never leaves
-# the link), emitted by the docker bridge interfaces at startup. Found
-# live via the dns-06 logging catch-all during the reboot test.
-ensure_egress_rule 'rule family="ipv4" protocol value="igmp" accept'
-
-# download.technitium.com - Technitium's own update check and DNS-app
-# downloads (dnsServerEnableCheckForUpdate / dnsAppsEnableAutomaticUpdate,
-# via go.technitium.com's redirect). Single DigitalOcean-hosted host,
-# both families; if updates start failing and the catch-all shows a new
-# address, it has moved. IPv6 found live via the reboot test.
-allow_egress ipv4 206.189.140.177/32 tcp 443
-allow_egress ipv6 2400:6180:100:d0::b3c:c001/128 tcp 443
-
-# Outbound DNS (53/udp+tcp) to ANY destination — a deliberate, documented
-# concession: this server does iterative recursive resolution (root ->
-# TLD -> authoritative), so its legitimate port-53 destinations are the
-# entire internet's DNS infrastructure and are inherently not enumerable.
-# Live validation on dns-06 proved per-address rules never converge (the
-# NextDNS steering layer alone rotated through three different
-# Cloudflare-network addresses within minutes). Covers DNS-to-DNS sync
-# between the six nodes, NextDNS plain-DNS/bootstrap on v4 and v6, and
-# all recursive resolution. Everything except DNS stays locked down.
-allow_egress_port ipv4 udp 53
-allow_egress_port ipv4 tcp 53
-allow_egress_port ipv6 udp 53
-allow_egress_port ipv6 tcp 53
-
-# NextDNS (be6f94), the sole forwarder — DoH/443.
-allow_egress ipv4 45.90.28.0/24 tcp 443
-allow_egress ipv4 45.90.30.0/24 tcp 443
-
-# NextDNS DoH over IPv6. dns.nextdns.io is a CNAME to
-# steering.nextdns.io, whose AAAA answers are the Misaka and Anexia
-# addresses below (the Anexia one doubles as the block-page host but is
-# required steering/DoH infrastructure regardless). Found live via the
-# dns-06 logging catch-all.
-allow_egress ipv6 2a0f:3b03:100:2:5054:ff:fe90:4a77/128 tcp 443
-allow_egress ipv6 2a00:11c0:8:4::9/128 tcp 443
-
-# abp.markridgwell.com blocklists (a CNAME to credfeto.github.io) -
-# GitHub Pages' Fastly range. Removable once adblockplusrules#623 serves
-# this content locally.
-allow_egress ipv4 185.199.108.0/22 tcp 443
-allow_egress ipv6 2606:50c0::/32 tcp 443
-
-# NTP via OPNsense, not the public pool.
-allow_egress ipv4 192.168.42.1/32 udp 123
-
-# Internal package/registry/docker-cache proxy — fronts pacman, aur,
-# dotnet, npm, api-nuget, docker-cache and docker-registry alike.
-# Both families - the IPv6 form was caught live by the dns-06 catch-all.
-# Two nodes (proxy-01/proxy-02, DMZ VLAN 192.168.140.0/24) since the DNS
-# records round-robin both.
-retire_egress_rule 'rule family="ipv4" destination address="192.168.150.250/32" port protocol="tcp" port="443" accept'
-retire_egress_rule 'rule family="ipv4" destination address="192.168.150.251/32" port protocol="tcp" port="443" accept'
-retire_egress_rule 'rule family="ipv6" destination address="2a02:8010:61d5:150::250/128" port protocol="tcp" port="443" accept'
-retire_egress_rule 'rule family="ipv6" destination address="2a02:8010:61d5:150::251/128" port protocol="tcp" port="443" accept'
-allow_egress ipv4 192.168.140.250/32 tcp 443
-allow_egress ipv4 192.168.140.251/32 tcp 443
-allow_egress ipv6 2a02:8010:61d5:140::250/128 tcp 443
-allow_egress ipv6 2a02:8010:61d5:140::251/128 tcp 443
-
-# Technitium's own "Query Logs (SQL Server)" app (sql-server.lan, Databases VLAN 13).
-allow_egress ipv4 192.168.130.254/32 tcp 1433
-
-# Central logging: VictoriaLogs HTTP ingest on monitoring.lan (Monitoring VLAN 16, journald via
-# systemd-journal-upload, credfeto-setup-arch-vm#234). IPv4 only for now:
-# the monitoring stack publishes its ports on IPv4 only.
-allow_egress ipv4 192.168.160.134/32 tcp 9428
-# DNS query logs from the Log Exporter app (syslog over UDP).
-allow_egress ipv4 192.168.160.134/32 udp 514
-
-# Dynamic (CDN-fronted, no stable CIDR) destinations — ipsets kept fresh
-# by scripts/refresh-egress-ipsets, installed and run below. Names use
-# short hand-picked slugs, not the literal domain, so they can't exceed
-# the kernel's 32-byte ipset name limit (IPSET_MAXNAMELEN) — keep this
-# slug list in sync with scripts/refresh-egress-ipsets's DOMAIN_SLUGS if
-# a domain is ever added, removed or renamed.
-EXISTING_IPSETS="$(sudo firewall-cmd --permanent --get-ipsets)"
-for SLUG in github chaotic pkgstats archwkd; do
-    ensure_ipset "dns-egress-${SLUG}-v4" inet
-    ensure_ipset "dns-egress-${SLUG}-v6" inet6
-done
-# GitHub's published ranges (scripts/github-egress-ranges) - networks, so
-# hash:net. Populated by scripts/refresh-egress-ipsets.
-ensure_ipset dns-egress-ghnet-v4 inet hash:net
-ensure_ipset dns-egress-ghnet-v6 inet6 hash:net
-
-# A newly created --permanent ipset isn't recognised as a valid
-# rich-rule destination target until firewalld reloads — without this,
-# --add-rich-rule fails with INVALID_IPSET even though the ipset exists.
-if [ "${IPSET_CREATED}" = "true" ]; then
-    sudo firewall-cmd --reload
+# Retire the firewalld egress policy and ipsets that inet dns_egress
+# replaces (loaded and verified above). Their refresh reloaded firewalld
+# every 10 minutes, and a firewalld killed mid-reload leaves its
+# block-everything table behind. The reload in finish_firewall below
+# removes them, together with any inbound rule change, in one go; after
+# that nothing here reloads firewalld for egress.
+if sudo firewall-cmd --state > /dev/null 2>&1; then
+    if sudo firewall-cmd --permanent --info-policy=dns-egress > /dev/null 2>&1; then
+        sudo firewall-cmd --permanent --delete-policy=dns-egress > /dev/null || die "Failed to delete the dns-egress policy"
+        FIREWALL_CHANGED=true
+    fi
+    for IPSET in $(sudo firewall-cmd --permanent --get-ipsets); do
+        case "${IPSET}" in
+            dns-egress-*)
+                sudo firewall-cmd --permanent --delete-ipset="${IPSET}" > /dev/null || die "Failed to delete ipset ${IPSET}"
+                FIREWALL_CHANGED=true
+                ;;
+        esac
+    done
 fi
-
-for SLUG in github chaotic pkgstats archwkd; do
-    allow_egress_ipset ipv4 "dns-egress-${SLUG}-v4" tcp 443
-    allow_egress_ipset ipv6 "dns-egress-${SLUG}-v6" tcp 443
-done
-allow_egress_ipset ipv4 dns-egress-ghnet-v4 tcp 443
-allow_egress_ipset ipv6 dns-egress-ghnet-v6 tcp 443
-
-# Catch-all, evaluated dead last (priority 32767): logs any egress not
-# matched by an allow rule above, with NO action of its own, so the
-# packet falls through to the policy target - accepted in observation
-# mode, dropped under enforcement. The target set in ensure_egress_policy
-# is therefore the single enforcement knob; the same log rule serves
-# both modes. (Earlier revisions used log+accept / log+drop catch-all
-# variants whose action overrode the target - retire those on
-# already-deployed nodes.)
-retire_egress_rule 'rule priority="32767" family="ipv4" log prefix="dns-egress-unmatched: " level="info" accept'
-retire_egress_rule 'rule priority="32767" family="ipv6" log prefix="dns-egress-unmatched: " level="info" accept'
-retire_egress_rule 'rule priority="32767" family="ipv4" log prefix="dns-egress-dropped: " level="info" drop'
-retire_egress_rule 'rule priority="32767" family="ipv6" log prefix="dns-egress-dropped: " level="info" drop'
-ensure_egress_rule 'rule priority="32767" family="ipv4" log prefix="dns-egress-unmatched: " level="info"'
-ensure_egress_rule 'rule priority="32767" family="ipv6" log prefix="dns-egress-unmatched: " level="info"'
 
 # Activate any changes now (the traps only cover abnormal exits from
 # this point on - the flag is reset once reloaded).
 finish_firewall
 
-# Install and enable the dynamic-egress ipset refresh timer.
-sudo install -m 755 "${BASEDIR}/scripts/refresh-egress-ipsets" /usr/local/bin/refresh-egress-ipsets
-sudo install -d -m 755 /usr/local/share/credfeto-adguard-home
-sudo install -m 644 "${BASEDIR}/scripts/github-egress-ranges" /usr/local/share/credfeto-adguard-home/github-egress-ranges
-sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.service" /etc/systemd/system/dns-egress-refresh.service
-sudo install -m 644 "${BASEDIR}/scripts/dns-egress-refresh.timer" /etc/systemd/system/dns-egress-refresh.timer
-sudo systemctl daemon-reload
-sudo systemctl enable dns-egress-refresh.timer
-# restart, not just enable --now: an already-active timer would keep its
-# old (possibly stalled) schedule instead of picking up the new unit.
-sudo systemctl restart dns-egress-refresh.timer
-
-# Populate the ipsets immediately rather than waiting for the timer's
-# first fire.
-sudo /usr/local/bin/refresh-egress-ipsets
+# A firewalld reload leaves other tables alone; confirm the egress table
+# is still loaded (dns-egress reloads it if not, and is a no-op otherwise).
+sudo /usr/local/bin/dns-egress || die "Failed to load the egress table"
+sudo nft list table inet dns_egress > /dev/null 2>&1 || die "Table inet dns_egress is not loaded"
 
 "${BASEDIR}/scripts/sync-zones" --all || die "Zone import failed"
 

@@ -7,7 +7,8 @@ See `CHANGELOG.md` for release history and notable changes.
 ## Prerequisites
 
 - Docker with Compose plugin
-- `firewall-cmd` (firewalld)
+- `firewall-cmd` (firewalld) for the inbound rules
+- `nft` (nftables) and `python3` for the egress table
 - `systemd`
 - Port 53 available on the host — disable the systemd-resolved stub listener if present:
 
@@ -74,7 +75,7 @@ Pulls the latest repo changes, ensures the container is running, applies firewal
 
 ### Zone changes
 
-Edit zone files in `zones/`, commit, and push. The systemd timer will pick up the changes within 15 minutes and import the updated zones via the Technitium API. Changes to `update` (firewall and egress rules), `docker-compose.yml` or the egress ipset refresher are applied the same way: `sync-zones` runs `./update` when the checkout is ahead of the commit `./update` last applied (recorded in `/var/lib/credfeto-adguard-home/applied-head`). To apply immediately:
+Edit zone files in `zones/`, commit, and push. The systemd timer will pick up the changes within 15 minutes and import the updated zones via the Technitium API. Changes to `update` (firewall rules), `docker-compose.yml`, the egress table builder (`scripts/egress`), its units or `scripts/github-egress-ranges` are applied the same way: `sync-zones` runs `./update` when the checkout is ahead of the commit `./update` last applied (recorded in `/var/lib/credfeto-adguard-home/applied-head`). To apply immediately:
 
 ```sh
 ./scripts/sync-zones
@@ -100,7 +101,9 @@ docker compose restart dns-server
 | --- | --- |
 | `install` | Installs and enables the systemd timer for zone sync |
 | `update` | Full update: pull, start container, apply firewall rules |
-| `scripts/sync-zones` | Pull latest; import changed zones via API. If the pulled commits change host config (`update`, `docker-compose.yml`, the egress ipset refresher or its timer) that hasn't been applied yet, it runs `./update` instead. `--all` imports every zone. |
+| `scripts/sync-zones` | Pull latest; import changed zones via API. Refreshes the egress table first. If the pulled commits change host config (`update`, `docker-compose.yml`, `scripts/egress`, its units or `scripts/github-egress-ranges`) that hasn't been applied yet, it runs `./update` instead. `--all` imports every zone. |
+| `scripts/egress` | Builds and loads the egress nftables table `inet dns_egress` (installed as `/usr/local/bin/dns-egress`; run by `update`, `sync-zones` and `dns-egress-refresh.timer`). Loads only when the rendered table differs from the loaded one. |
+| `scripts/update-github-egress-ranges` | Regenerates `scripts/github-egress-ranges` from https://api.github.com/meta. Run by the `Repo: Update GitHub egress ranges` workflow, not on a DNS node. |
 | `reset` | Stop and remove containers, then run `update` |
 | `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
 | `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
@@ -160,11 +163,21 @@ cp zones/audiobookshelf.markridgwell.com.db zones/newservice.markridgwell.com.db
 
 Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `check-proxy-ips` with no address arguments checks the current default set (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250` and `2a02:8010:61d5:140::251`), which `scripts/self-test` relies on, so update the defaults in the script when a proxy address changes.
 
-`replace-proxy-ip` only changes A/AAAA records. The following still need updating by hand: the reverse PTR records in `140.168.192.in-addr.arpa.db` and `0.4.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db` (bump their serials too), the egress firewall rules in `update`, and `docs/network/egress-whitelist.md`. Grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
+`replace-proxy-ip` only changes A/AAAA records. The following still need updating by hand: the reverse PTR records in `140.168.192.in-addr.arpa.db` and `0.4.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db` (bump their serials too), the egress allow-list in `scripts/egress`, and `docs/network/egress-whitelist.md`. Grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
 
 ## Security notes
 
 - The container uses `network_mode: host` — it binds directly to the host's network stack. Firewall rules are the primary access control.
 - DHCP ports 67/68 are explicitly rejected at the firewall even though Technitium's DHCP server is inactive by default.
+- Outbound traffic is deny-by-default with an explicit allow-list (see [Egress firewall](#egress-firewall)).
 - `DNS_SERVER_RECURSION=AllowOnlyForPrivateNetworks` prevents this server from acting as an open resolver.
 - The admin UI uses a self-signed certificate on port 53443. Accept the browser warning or add the cert to your trust store.
+
+## Egress firewall
+
+The host's outbound traffic is filtered by one nftables table, `inet dns_egress`, which `scripts/egress` builds and loads. Technitium uses host networking, so its recursion, forwarding, blocklist downloads and log shipping all go through the table's `host_out` chain (the `output` hook). Watchtower, on a Docker bridge, is not filtered by it.
+
+- **Allowed:** DNS (53/tcp+udp) to any destination, since recursive resolution reaches every authoritative server; HTTPS (443/tcp) to the proxies (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`), NextDNS, download.technitium.com, GitHub Pages (Fastly), GitHub's published ranges and the resolved addresses of github.com, cdn-mirror.chaotic.cx, pkgstats.archlinux.de and openpgpkey.archlinux.org; NTP to `192.168.42.1`; SQL Server (1433/tcp) on `192.168.130.254`; VictoriaLogs (9428/tcp) and syslog (514/udp) on `192.168.160.134`; ICMPv6, IGMP and DHCPv6. `scripts/egress` holds the list, and `docs/network/egress-whitelist.md` the reasons.
+- **Enforcement:** on by default: unmatched new connections are dropped. Set `DNS_EGRESS_ENFORCE=false` in `.env` for observation mode, where they are accepted. Any other value, or none, enforces. In both modes unmatched connections are logged with the kernel log prefix `dns-egress-unmatched: ` (at most 30 a minute).
+- **Refresh:** `dns-egress-refresh.service` runs `/usr/local/bin/dns-egress` at boot, before Docker starts, and `dns-egress-refresh.timer` runs it every 10 minutes; `sync-zones` runs it before each pull. Each run resolves the names (keeping the last good answer, in `/var/lib/credfeto-adguard-home/egress-resolved.json`, for a name that does not resolve) and reads `/usr/local/share/credfeto-adguard-home/github-egress-ranges`. The table, sets included, is replaced in one `nft -f` transaction, only when it changed, and is checked with `nft -c` first, so a rejected ruleset leaves the loaded one in place. firewalld is never reloaded for egress.
+- **Migration:** on a node that still has the firewalld `dns-egress` policy and `dns-egress-*` ipsets, `update` loads and verifies the table first, then deletes the policy and ipsets and activates that with a single `firewall-cmd --reload`.

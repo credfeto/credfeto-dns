@@ -101,10 +101,10 @@ fi
 # Keep in sync with ./update.
 APPLIED_HEAD_FILE="/var/lib/credfeto-adguard-home/applied-head"
 
-# Paths whose changes only take effect when ./update runs: the firewall
-# and egress rules (update), the dynamic egress ipset refresher and its
-# timer, and the container definition.
-HOST_CONFIG_PATHS="update docker-compose.yml scripts/refresh-egress-ipsets scripts/dns-egress-refresh.service scripts/dns-egress-refresh.timer scripts/github-egress-ranges"
+# Paths whose changes only take effect when ./update runs: the inbound
+# firewall rules (update), the egress table builder, its units and the
+# GitHub ranges it reads, and the container definition.
+HOST_CONFIG_PATHS="update docker-compose.yml scripts/egress scripts/dns-egress-refresh.service scripts/dns-egress-refresh.timer scripts/github-egress-ranges"
 
 # Re-run ./update when the checkout holds host-config changes that were
 # never applied since the commit ./update last recorded. With no usable
@@ -136,22 +136,24 @@ apply_host_config_if_changed() {
     run_update "changed since last apply"
 }
 
-# Refresh the dynamic egress ipsets (github.com etc.) on every run, BEFORE
-# the pull: the pull itself needs github.com, whose address rotates often,
-# so a stale set would block the very fetch that keeps this host current.
-# A failed refresh is only a warning; the pull below then reports the real
-# outcome. dns-egress-refresh.timer still runs it between syncs too.
-refresh_egress_ipsets() {
-    _refresh="/usr/local/bin/refresh-egress-ipsets"
-    if [ ! -x "${_refresh}" ]; then
-        echo "sync-zones: warning: ${_refresh} not installed; run ./update" >&2
+# Refresh the egress table (github.com etc.) on every run, BEFORE the
+# pull: the pull itself needs github.com, whose address rotates often, so
+# a stale set would block the very fetch that keeps this host current. A
+# failed refresh is only a warning; the pull below then reports the real
+# outcome. dns-egress-refresh.timer still runs it between syncs too. A
+# node whose ./update has not yet installed dns-egress still has the
+# firewalld ipset refresher it replaces.
+refresh_egress() {
+    for _refresh in /usr/local/bin/dns-egress /usr/local/bin/refresh-egress-ipsets; do
+        [ -x "${_refresh}" ] || continue
+        echo "sync-zones: refreshing egress rules..."
+        "${_refresh}" || echo "sync-zones: warning: egress refresh failed" >&2
         return 0
-    fi
-    echo "sync-zones: refreshing egress ipsets..."
-    "${_refresh}" || echo "sync-zones: warning: egress ipset refresh failed" >&2
+    done
+    echo "sync-zones: warning: /usr/local/bin/dns-egress not installed; run ./update" >&2
 }
 
-refresh_egress_ipsets
+refresh_egress
 
 PREV_HEAD="$(git -C "${BASEDIR}" rev-parse HEAD)"
 

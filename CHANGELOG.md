@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
+- Egress firewall moved from the firewalld `dns-egress` policy and `dns-egress-*` ipsets to one nftables table, `inet dns_egress`, built by `scripts/egress` and replaced atomically (`nft -f`, checked with `nft -c` first) by `./update`, `scripts/sync-zones` and `dns-egress-refresh.timer`, so refreshing it never reloads firewalld (a firewalld killed mid-reload leaves its block-everything table loaded). Same allow-list and the same `DNS_EGRESS_ENFORCE` semantics (enforce unless exactly `false`); it is also loaded at boot before Docker starts. `./update` loads and verifies the table before it deletes the old policy and ipsets, with a single firewalld reload. `scripts/refresh-egress-ipsets` is removed.
 - The proxies' Servers VLAN addresses (`192.168.150.250`, `192.168.150.251`, `2a02:8010:61d5:150::250`, `2a02:8010:61d5:150::251`) are no longer trusted: `./update` retires their egress (443/tcp) and 538/tcp rules on existing nodes, and `scripts/sync-zones` drops them from `dnsReverseProxyNetworkACL`
 - The reverse proxies' DMZ VLAN addresses (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`) are trusted alongside their Servers VLAN addresses: egress allow-list (443/tcp), DNS-over-TCP-PROXY port 538 (`./update`) and `dnsReverseProxyNetworkACL` (`scripts/sync-zones`), so proxy-01/proxy-02 can move to the DMZ one at a time
 ### Added

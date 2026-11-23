@@ -5,26 +5,40 @@ Working notes for restricting outbound traffic from the `credfeto-dns` hosts
 (`opnsense.lan`, `192.168.10.1` / gateway seen from the DNS VLAN as
 `192.168.42.1`) to an explicit allow-list, deny-by-default.
 
-Status: **ENFORCED FLEET-WIDE (2026-09-03)** — all six nodes on policy
-target `DROP`, and enforcement is now the *default* in `./update`
-(`DNS_EGRESS_ENFORCE` unset means enforce; set `false` in `.env` for
-observation mode when validating a new node). The catch-all is a single
-action-less log rule (`dns-egress-unmatched:` prefix in the kernel log,
-both modes) — logged packets fall through to the policy target, which is
-the sole enforcement knob; the `dns-egress-dropped:` prefix seen in this
-document's history belonged to a retired log+drop catch-all variant.
-For ad-hoc Technitium API access during investigations like this one,
+Status: **ENFORCED** on all six nodes. The rules are one nftables table,
+`inet dns_egress`, built and loaded by `scripts/egress` (installed as
+`/usr/local/bin/dns-egress`), with one chain, `host_out`, on the `output`
+hook. Technitium uses host networking, so all of its traffic goes through
+that chain; Watchtower, on a Docker bridge, is not filtered by it. The
+allow-list in `scripts/egress` is the source of truth; the sections below
+record why each destination is on it.
+
+- Enforcement is the default: `./update` writes `DNS_EGRESS_ENFORCE` from
+  `.env` to `/var/lib/credfeto-adguard-home/egress-enforce`, and only the
+  exact value `false` gives observation mode (unmatched new connections
+  accepted). Unset, a typo or a missing file means enforce (fail closed).
+- Unmatched new connections are logged in both modes with the kernel log
+  prefix `dns-egress-unmatched:`, at most 30 a minute.
+- CDN-fronted names (github.com, cdn-mirror.chaotic.cx,
+  pkgstats.archlinux.de, openpgpkey.archlinux.org) are resolved on every
+  run, and GitHub's published ranges are read from
+  `scripts/github-egress-ranges`. Their IPv6 sets also hold the NAT64
+  (`64:ff9b::/96`) form of every IPv4 address, computed rather than taken
+  from the resolver, so DNS64 state cannot make them flap. A name that
+  does not resolve keeps its last good answer.
+- The table, sets included, is replaced in one `nft -f` transaction and
+  only when the rendered ruleset changed; `nft -c` checks it first, so a
+  rejected ruleset leaves the loaded one in place. firewalld is never
+  reloaded for egress.
+- `dns-egress-refresh.service` loads it at boot, before Docker starts, and
+  `dns-egress-refresh.timer` refreshes it every 10 minutes;
+  `scripts/sync-zones` refreshes it before every pull.
+
+For ad-hoc Technitium API access during investigations,
 `scripts/get-session-token` logs in with the `.env` admin password and
-prints a session token. Rollout: dns-06 first
-(2026-09-02) after a clean observed hour; the rest followed 2026-09-03
-after their own clean combined observation hour, each verified resolving
-under `DROP` before the next was enforced. Prerequisites that made this
-possible: NTP via the gateway (credfeto-setup-arch-vm#223, deployed via
-networkd `NTP=`), pacman `Server=`-only through the internal proxy
-(#224/PR #226), the broad port-53 concession, and dynamic ipsets with
-deterministic NAT64 forms. The Fastly allowance for
-`abp.markridgwell.com` remains a known accepted over-allowance until
-adblockplusrules#623 / credfeto-dns#38.
+prints a session token. The Fastly allowance for `abp.markridgwell.com`
+is a known, accepted over-allowance until that content is served
+locally.
 
 ## Hosts
 

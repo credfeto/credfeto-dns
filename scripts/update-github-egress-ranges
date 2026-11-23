@@ -4,9 +4,9 @@
 # list (https://api.github.com/meta: the web, git and api ranges). The
 # "Repo: Update GitHub egress ranges" workflow runs it daily and commits
 # any change to main; it can also be run by hand on a workstation (not on
-# a DNS node: their egress policy only allows GitHub itself). sync-zones
+# a DNS node: their egress table only allows GitHub itself). sync-zones
 # then applies the new list on every node: the file is in its
-# HOST_CONFIG_PATHS.
+# HOST_CONFIG_PATHS, and scripts/egress reads it.
 
 set -eu
 
