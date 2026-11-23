@@ -133,7 +133,7 @@ Zones are maintained as BIND-format `.db` files in `zones/`. Technitium writes i
 | --- | --- | --- |
 | `lan.db` | Primary | `.lan` hostnames (Proxmox nodes, network devices) |
 | `dns.lan.db` | Primary | DNS server hostnames |
-| `proxy.markridgwell.com.db` | Primary | A/AAAA records → `192.168.150.250` (proxy-01) and `192.168.150.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
+| `proxy.markridgwell.com.db` | Primary | A/AAAA records → `192.168.150.250` (proxy-01) and `192.168.140.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
 | `<service>.markridgwell.com.db` | Override | Per-service A/AAAA → both proxy addresses (round-robin) |
 | `<resolver>.db` | Override | DoH resolver IP overrides (Cloudflare, Google, Quad9) |
 
@@ -158,7 +158,7 @@ cp zones/audiobookshelf.markridgwell.com.db zones/newservice.markridgwell.com.db
 ./scripts/check-proxy-ips 192.168.150.252 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251
 ```
 
-Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `check-proxy-ips` with no address arguments checks the current default set (`192.168.150.250`, `192.168.150.251`, `2a02:8010:61d5:150::250` and `2a02:8010:61d5:150::251`), which `scripts/self-test` relies on, so update the defaults in the script when a proxy address changes.
+Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `check-proxy-ips` with no address arguments checks the current default set (`192.168.150.250`, `192.168.140.251`, `2a02:8010:61d5:150::250` and `2a02:8010:61d5:140::251`), which `scripts/self-test` relies on, so update the defaults in the script when a proxy address changes.
 
 `replace-proxy-ip` only changes A/AAAA records. The following still need updating by hand: the reverse PTR records in `150.168.192.in-addr.arpa.db` and `0.5.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db` (bump their serials too), the egress firewall rules in `update`, and `docs/network/egress-whitelist.md`. Grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
 

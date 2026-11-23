@@ -1,7 +1,7 @@
 $ORIGIN lan.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    26      ; serial
+    28      ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -58,8 +58,8 @@ development         IN A 192.168.180.176
 arch-vm-test        IN A 192.168.150.177
 proxy-01            IN A 192.168.150.250
 proxy-01            IN AAAA 2a02:8010:61d5:150::250
-proxy-02            IN A 192.168.150.251
-proxy-02            IN AAAA 2a02:8010:61d5:150::251
+proxy-02            IN A 192.168.140.251
+proxy-02            IN AAAA 2a02:8010:61d5:140::251
 keys                IN A 192.168.150.220
 docker-registry     IN A 192.168.150.202
 gickup              IN A 192.168.150.13
