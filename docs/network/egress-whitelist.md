@@ -444,6 +444,9 @@ allow_egress_ipv4 "192.168.42.1/32" 123 udp
 # still needs an explicit allow if OPNsense enforces inter-VLAN rules.
 allow_egress_ipv4 "192.168.150.250/32" 443 tcp
 allow_egress_ipv4 "192.168.150.251/32" 443 tcp
+# Their DMZ VLAN addresses (192.168.140.0/24), allowed alongside the above.
+allow_egress_ipv4 "192.168.140.250/32" 443 tcp
+allow_egress_ipv4 "192.168.140.251/32" 443 tcp
 
 # --- Confirmed: Technitium's own MSSQL query-logging app ---
 allow_egress_ipv4 "192.168.130.254/32" 1433 tcp

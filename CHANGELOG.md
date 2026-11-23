@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
+- The reverse proxies' DMZ VLAN addresses (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`) are trusted alongside their Servers VLAN addresses: egress allow-list (443/tcp), DNS-over-TCP-PROXY port 538 (`./update`) and `dnsReverseProxyNetworkACL` (`scripts/sync-zones`), so proxy-01/proxy-02 can move to the DMZ one at a time
 ### Added
 - DNS query logs to VictoriaLogs: `scripts/sync-zones` installs the Technitium Log Exporter app (3.1.1) when missing and applies `scripts/log-exporter.json` (RFC 5424 syslog over UDP to monitoring.lan 192.168.150.134:514); `./update` opens 192.168.150.134:514/udp in the egress allow-list. Runs with every full zone import (./update, or when host config changes)
 - Egress allow-list: VictoriaLogs on monitoring.lan (`192.168.150.134:9428/tcp`), so the DNS hosts can forward their journal with systemd-journal-upload (credfeto/credfeto-setup-arch-vm#234)
