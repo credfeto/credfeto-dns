@@ -238,8 +238,19 @@ allow_port udp 443
 # by Traefik on the proxies, which forward here with PROXY protocol v2. Only
 # the proxies may connect (they are also the only trusted reverse proxies in
 # dnsReverseProxyNetworkACL, set by scripts/sync-zones).
-allow_port_from tcp 538 192.168.150.250 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251 \
-    192.168.140.250 192.168.140.251 2a02:8010:61d5:140::250 2a02:8010:61d5:140::251
+allow_port_from tcp 538 192.168.140.250 192.168.140.251 2a02:8010:61d5:140::250 2a02:8010:61d5:140::251
+# The proxies' Servers VLAN addresses are no longer in use.
+for ADDR in 192.168.150.250 192.168.150.251 2a02:8010:61d5:150::250 2a02:8010:61d5:150::251; do
+    case "${ADDR}" in
+        *:*) FAMILY=ipv6 ;;
+        *) FAMILY=ipv4 ;;
+    esac
+    RULE="rule family=\"${FAMILY}\" source address=\"${ADDR}\" port protocol=\"tcp\" port=\"538\" accept"
+    if sudo firewall-cmd --query-rich-rule="${RULE}" --permanent > /dev/null 2>&1; then
+        sudo firewall-cmd --permanent --remove-rich-rule="${RULE}" || die "Failed to remove firewall rule: ${RULE}"
+        FIREWALL_CHANGED=true
+    fi
+done
 
 # Explicitly block DHCP — Technitium includes a DHCP server but it should
 # never serve on this host; reject at the firewall regardless of app config.
@@ -312,12 +323,12 @@ allow_egress ipv4 192.168.42.1/32 udp 123
 # Internal package/registry/docker-cache proxy — fronts pacman, aur,
 # dotnet, npm, api-nuget, docker-cache and docker-registry alike.
 # Both families - the IPv6 form was caught live by the dns-06 catch-all.
-# Two nodes (proxy-01/proxy-02) since the DNS records round-robin both,
-# each allowed on its Servers VLAN and its DMZ VLAN (192.168.140.0/24) address.
-allow_egress ipv4 192.168.150.250/32 tcp 443
-allow_egress ipv4 192.168.150.251/32 tcp 443
-allow_egress ipv6 2a02:8010:61d5:150::250/128 tcp 443
-allow_egress ipv6 2a02:8010:61d5:150::251/128 tcp 443
+# Two nodes (proxy-01/proxy-02, DMZ VLAN 192.168.140.0/24) since the DNS
+# records round-robin both.
+retire_egress_rule 'rule family="ipv4" destination address="192.168.150.250/32" port protocol="tcp" port="443" accept'
+retire_egress_rule 'rule family="ipv4" destination address="192.168.150.251/32" port protocol="tcp" port="443" accept'
+retire_egress_rule 'rule family="ipv6" destination address="2a02:8010:61d5:150::250/128" port protocol="tcp" port="443" accept'
+retire_egress_rule 'rule family="ipv6" destination address="2a02:8010:61d5:150::251/128" port protocol="tcp" port="443" accept'
 allow_egress ipv4 192.168.140.250/32 tcp 443
 allow_egress ipv4 192.168.140.251/32 tcp 443
 allow_egress ipv6 2a02:8010:61d5:140::250/128 tcp 443

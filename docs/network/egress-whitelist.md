@@ -67,7 +67,7 @@ From `docker-compose.yml`:
   (`WATCHTOWER_SCHEDULE`, default `0 12 * * * *`, overridable via `.env`). **Confirmed not direct-to-internet:**
   Docker's daemon config (`/etc/docker/daemon.json`) sets
   `registry-mirrors: ["https://docker-cache.markridgwell.com"]`, which
-  resolves to `192.168.150.250`/`192.168.150.251` — an internal cache/proxy
+  resolves to `192.168.140.250`/`192.168.140.251` — an internal cache/proxy
   pair (proxy-01/proxy-02). Watchtower
   pulls through the Docker daemon/API, so it inherits this automatically;
   it only needs to reach that internal pair, not Docker Hub directly.
@@ -102,7 +102,7 @@ From systemd units on the host (`ansible-pull.service` /
   not a steady-state one.
 - `roles/ssh/tasks/main.yml` configures sshd's `AuthorizedKeysCommand` to
   `curl https://keys.markridgwell.com/keys/<hostname>/%u` — confirmed
-  internal (`192.168.150.250`), but note this runs on **every SSH login**
+  internal (`192.168.140.250`), but note this runs on **every SSH login**
   to any of these boxes, not just during ansible-pull — a live runtime
   dependency, not a periodic one.
 - `roles/telegraf/templates/telegraf.conf.j2` pushes metrics to
@@ -181,7 +181,7 @@ locked down to only accept from the DNS VLAN.
   `dotnet.markridgwell.com`, `npm.markridgwell.com`,
   `docker-cache.markridgwell.com`, `docker-registry.markridgwell.com` and
   `api-nuget.markridgwell.com` all resolve to the same two internal hosts,
-  `192.168.150.250` and `192.168.150.251` (proxy-01/proxy-02) — a
+  `192.168.140.250` and `192.168.140.251` (proxy-01/proxy-02) — a
   reverse-proxy/cache pair fronting every package source. Egress for all
   of these is internal-only from the DNS boxes'
   point of view; no external whitelisting needed for package installs.
@@ -204,7 +204,7 @@ locked down to only accept from the DNS VLAN.
    and sends it to dns-02 instead, so it never reaches Google. Not egress,
    no action needed.
 4. ~~What does `credfeto-setup-arch-vm` reach?~~ **Resolved — audited
-   directly.** Package mirrors are internal-only (`192.168.150.250`), as
+   directly.** Package mirrors are internal-only (`192.168.140.250`), as
    expected. Three real external destinations found that weren't
    previously known: `cdn-mirror.chaotic.cx` (Chaotic AUR, runs every
    hourly pull), `hkps://keyserver.ubuntu.com` (rare, only on an
@@ -215,7 +215,7 @@ locked down to only accept from the DNS VLAN.
    credfeto/credfeto-monitoring#28 and credfeto/credfeto-setup-arch-vm#220.
 5. ~~Is Watchtower still wanted?~~ **Decided: yes, keep it — and resolved:**
    it pulls through the Docker daemon's `registry-mirrors` setting
-   (`docker-cache.markridgwell.com` -> `192.168.150.250`, internal), so it
+   (`docker-cache.markridgwell.com` -> `192.168.140.250`, internal), so it
    never needs direct Docker Hub egress. No public range needed after all.
 6. ~~What is `192.168.130.254:1433` (MSSQL) for?~~ **Resolved:** Technitium's
    own "Query Logs (SQL Server)" app, confirmed installed via the API.
@@ -436,15 +436,12 @@ allow_egress_ipv6 "2606:50c0::/32" 443 tcp
 # confirm OPNsense is actually serving NTP on the DNS VLAN before relying on this.
 allow_egress_ipv4 "192.168.42.1/32" 123 udp
 
-# --- Confirmed: internal package/registry cache proxy pair (proxy-01/proxy-02: 192.168.150.250, 192.168.150.251) ---
+# --- Confirmed: internal package/registry cache proxy pair (proxy-01/proxy-02: 192.168.140.250, 192.168.140.251, DMZ VLAN) ---
 # Fronts docker-cache, docker-registry, pacman, aur, dotnet, npm and
 # api-nuget (all confirmed to resolve here) - covers Watchtower's pulls
 # (via Docker's registry-mirrors setting) and, once confirmed, whatever
 # credfeto-setup-arch-vm restores. Cross-VLAN, not internet egress, but
 # still needs an explicit allow if OPNsense enforces inter-VLAN rules.
-allow_egress_ipv4 "192.168.150.250/32" 443 tcp
-allow_egress_ipv4 "192.168.150.251/32" 443 tcp
-# Their DMZ VLAN addresses (192.168.140.0/24), allowed alongside the above.
 allow_egress_ipv4 "192.168.140.250/32" 443 tcp
 allow_egress_ipv4 "192.168.140.251/32" 443 tcp
 

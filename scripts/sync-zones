@@ -43,7 +43,7 @@ configure_server() {
     # by Traefik on the two proxies and forwarded to port 538 with PROXY protocol v2;
     # only the proxies are trusted to supply the real client address.
     curl -sf -k -X POST \
-        "${DNS_API_URL}/api/settings/set?token=${DNS_API_TOKEN}&webServiceEnableHttp3=true&enableDnsOverHttps=true&dnsOverHttpsPort=443&enableDnsOverHttp3=true&dnsTlsCertificatePath=cert.pfx&dnsTlsCertificatePassword=&enableDnsOverTcpProxy=true&dnsOverTcpProxyPort=538&dnsReverseProxyNetworkACL=192.168.150.250,192.168.150.251,2a02:8010:61d5:150::250,2a02:8010:61d5:150::251,192.168.140.250,192.168.140.251,2a02:8010:61d5:140::250,2a02:8010:61d5:140::251" \
+        "${DNS_API_URL}/api/settings/set?token=${DNS_API_TOKEN}&webServiceEnableHttp3=true&enableDnsOverHttps=true&dnsOverHttpsPort=443&enableDnsOverHttp3=true&dnsTlsCertificatePath=cert.pfx&dnsTlsCertificatePassword=&enableDnsOverTcpProxy=true&dnsOverTcpProxyPort=538&dnsReverseProxyNetworkACL=192.168.140.250,192.168.140.251,2a02:8010:61d5:140::250,2a02:8010:61d5:140::251" \
         > /dev/null \
         || echo "sync-zones: warning: server settings update failed" >&2
 }
