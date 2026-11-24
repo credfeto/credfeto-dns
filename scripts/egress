@@ -29,6 +29,7 @@ missing file) drops unmatched new connections; "false" only logs them
 ("dns-egress-unmatched: ", 30 a minute) and lets them through.
 """
 
+import fcntl
 import ipaddress
 import json
 import os
@@ -154,8 +155,10 @@ def gather_sets():
             log(f"{path} unreadable ({e}); {slug} is empty")
             sets[slug] = ([], [])
     os.makedirs(STATE_DIR, exist_ok=True)
-    tmp = CACHE_FILE + ".tmp"
-    with open(tmp, "w") as f:
+    # Unique temp name: a fixed ".tmp" let two concurrent runs replace each
+    # other's file and fail with FileNotFoundError.
+    fd, tmp = tempfile.mkstemp(dir=STATE_DIR, suffix=".json")
+    with os.fdopen(fd, "w") as f:
         json.dump(resolved, f, indent=1, sort_keys=True)
     os.replace(tmp, CACHE_FILE)
     return sets
@@ -251,6 +254,11 @@ def loaded():
 def main():
     if os.geteuid() != 0:
         sys.exit("egress: must run as root")
+    # The refresh timer and the firewall sync can start in the same second;
+    # serialise runs so they don't race over the cache and the loaded table.
+    os.makedirs(STATE_DIR, exist_ok=True)
+    lock = open(os.path.join(STATE_DIR, "egress.lock"), "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
     # Fail closed: only an explicit "false" means observation mode.
     try:
         with open(ENFORCE_FILE) as f:
