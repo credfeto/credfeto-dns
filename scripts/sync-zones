@@ -72,14 +72,13 @@ configure_log_exporter() {
 }
 
 # Hide internal names from untrusted VLANs: IoT (192.168.34.0/24), CCTV
-# (192.168.60.0/24), Printers (192.168.66.0/24) and VLAN 13 (192.168.130.0/24),
-# plus their IPv6 /64s, get REFUSED for the LAN zones (lan, *.lan), every
+# (192.168.60.0/24) and Printers (192.168.66.0/24), plus their IPv6 /64s, get REFUSED for the LAN zones (lan, *.lan), every
 # reverse zone (*.arpa) and the internal *.markridgwell.com zones. Only the
 # names those devices actually use stay open to them: the TRMNL display's
 # server (trmnl, trmnl-assets) and Home Assistant, which the H&T sensors
 # report to. Every other client is allowed as before. Public DoH/DoT
 # resolver zones (dns.google, *.cloudflare-dns.com, ...) are left open.
-RESTRICTED_QUERY_ACL="!192.168.34.0/24,!2a02:8010:61d5:34::/64,!192.168.60.0/24,!2a02:8010:61d5:60::/64,!192.168.66.0/24,!2a02:8010:61d5:66::/64,!192.168.130.0/24,!2a02:8010:61d5:130::/64,0.0.0.0/0,::/0"
+RESTRICTED_QUERY_ACL="!192.168.34.0/24,!2a02:8010:61d5:34::/64,!192.168.60.0/24,!2a02:8010:61d5:60::/64,!192.168.66.0/24,!2a02:8010:61d5:66::/64,0.0.0.0/0,::/0"
 OPEN_TO_UNTRUSTED_ZONES="trmnl.markridgwell.com trmnl-assets.markridgwell.com homeassistant.markridgwell.com"
 
 zone_is_restricted() {
