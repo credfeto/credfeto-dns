@@ -71,6 +71,55 @@ configure_log_exporter() {
         || echo "sync-zones: warning: ${LOG_EXPORTER_APP} config update failed" >&2
 }
 
+# Hide internal names from untrusted VLANs: IoT (192.168.34.0/24), CCTV
+# (192.168.60.0/24), Printers (192.168.66.0/24) and VLAN 13 (192.168.130.0/24),
+# plus their IPv6 /64s, get REFUSED for the LAN zones (lan, *.lan), every
+# reverse zone (*.arpa) and the internal *.markridgwell.com zones. Only the
+# names those devices actually use stay open to them: the TRMNL display's
+# server (trmnl, trmnl-assets) and Home Assistant, which the H&T sensors
+# report to. Every other client is allowed as before. Public DoH/DoT
+# resolver zones (dns.google, *.cloudflare-dns.com, ...) are left open.
+RESTRICTED_QUERY_ACL="!192.168.34.0/24,!2a02:8010:61d5:34::/64,!192.168.60.0/24,!2a02:8010:61d5:60::/64,!192.168.66.0/24,!2a02:8010:61d5:66::/64,!192.168.130.0/24,!2a02:8010:61d5:130::/64,0.0.0.0/0,::/0"
+OPEN_TO_UNTRUSTED_ZONES="trmnl.markridgwell.com trmnl-assets.markridgwell.com homeassistant.markridgwell.com"
+
+zone_is_restricted() {
+    for _open in ${OPEN_TO_UNTRUSTED_ZONES}; do
+        [ "$1" != "${_open}" ] || return 1
+    done
+    case "$1" in
+        lan | *.lan | *.arpa | *.markridgwell.com) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Applied to every zone on every run (it is idempotent and cheap), so a zone
+# that is added, re-created or imported always ends up with the right access,
+# and a setting changed by hand is put back on the next run.
+set_query_access() {
+    if zone_is_restricted "$1"; then
+        curl -sf -k -X POST "${DNS_API_URL}/api/zones/options/set?token=${DNS_API_TOKEN}" \
+            --data-urlencode "zone=$1" \
+            --data-urlencode "queryAccess=UseSpecifiedNetworkACL" \
+            --data-urlencode "queryAccessNetworkACL=${RESTRICTED_QUERY_ACL}" \
+            > /dev/null
+    else
+        curl -sf -k -X POST "${DNS_API_URL}/api/zones/options/set?token=${DNS_API_TOKEN}" \
+            --data-urlencode "zone=$1" \
+            --data-urlencode "queryAccess=Allow" \
+            > /dev/null
+    fi
+}
+
+apply_query_access() {
+    echo "sync-zones: applying zone query access..."
+    _failed=0
+    for _db in "${BASEDIR}/zones"/*.db; do
+        _zone="$(basename "${_db}" .db)"
+        set_query_access "${_zone}" || { echo "sync-zones: warning: query access update failed for ${_zone}" >&2; _failed=$((_failed + 1)); }
+    done
+    [ "${_failed}" -eq 0 ] || echo "sync-zones: warning: ${_failed} zone(s) did not get their query access set; retried on the next run" >&2
+}
+
 import_zone() {
     _ZONE_NAME="$(basename "$1" .db)"
     echo "sync-zones: importing ${_ZONE_NAME}..."
@@ -92,6 +141,7 @@ if [ "${IMPORT_ALL}" = "true" ]; then
     for DB_FILE in "${BASEDIR}/zones"/*.db; do
         import_zone "${DB_FILE}" || ERRORS=$((ERRORS + 1))
     done
+    apply_query_access
     [ "${ERRORS}" -eq 0 ] || die "sync-zones: ${ERRORS} zone(s) failed to import."
     echo "sync-zones: all zones imported."
     exit 0
@@ -163,28 +213,37 @@ NEW_HEAD="$(git -C "${BASEDIR}" rev-parse HEAD)"
 
 apply_host_config_if_changed
 
+CHANGED_ZONES="$(git -C "${BASEDIR}" diff --name-only "${PREV_HEAD}..${NEW_HEAD}" -- 'zones/*.db')"
+
+# Import before setting access, so a newly created zone gets its ACL in this run.
+import_changed_zones() {
+    ERRORS=0
+    for ZONE_FILE in ${CHANGED_ZONES}; do
+        ABS_FILE="${BASEDIR}/${ZONE_FILE}"
+        if [ ! -f "${ABS_FILE}" ]; then
+            echo "sync-zones: $(basename "${ZONE_FILE}" .db) removed from git — delete via admin UI if needed"
+            continue
+        fi
+        import_zone "${ABS_FILE}" || ERRORS=$((ERRORS + 1))
+    done
+}
+
+if [ -n "${CHANGED_ZONES}" ]; then
+    echo "sync-zones: zone changes detected, importing..."
+    import_changed_zones
+fi
+
+apply_query_access
+
 if [ "${PREV_HEAD}" = "${NEW_HEAD}" ]; then
     echo "sync-zones: no changes pulled, nothing to do."
     exit 0
 fi
 
-CHANGED_ZONES="$(git -C "${BASEDIR}" diff --name-only "${PREV_HEAD}..${NEW_HEAD}" -- 'zones/*.db')"
-
 if [ -z "${CHANGED_ZONES}" ]; then
     echo "sync-zones: no zone changes in this pull, skipping import."
     exit 0
 fi
-
-echo "sync-zones: zone changes detected, importing..."
-ERRORS=0
-for ZONE_FILE in ${CHANGED_ZONES}; do
-    ABS_FILE="${BASEDIR}/${ZONE_FILE}"
-    if [ ! -f "${ABS_FILE}" ]; then
-        echo "sync-zones: $(basename "${ZONE_FILE}" .db) removed from git — delete via admin UI if needed"
-        continue
-    fi
-    import_zone "${ABS_FILE}" || ERRORS=$((ERRORS + 1))
-done
 
 [ "${ERRORS}" -eq 0 ] || die "sync-zones: ${ERRORS} zone(s) failed to import."
 echo "sync-zones: done."
