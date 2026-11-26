@@ -204,6 +204,29 @@ refresh_egress() {
 
 refresh_egress
 
+# Self-heal query-log export. The Log Exporter's UDP syslog sink stops for good
+# when VictoriaLogs is unreachable for a while (for example while the
+# monitoring VM reboots) and the app never recreates it, so queries stop
+# reaching VictoriaLogs while everything looks healthy. Every run, ask
+# VictoriaLogs (same host as the syslog target in log-exporter.json, port 9428)
+# whether it has seen this node in the last 15 minutes. If it answers with
+# nothing, re-save the app config, which recreates the sink. If VictoriaLogs
+# can't be reached, do nothing: the next run tries again.
+ensure_log_export() {
+    _vl_host="$(sed -n 's/.*"address":[[:space:]]*"\([^"]*\)".*/\1/p' "${SCRIPTDIR}/log-exporter.json" | head -n 1)"
+    [ -n "${_vl_host}" ] || return 0
+    _src="$(ip -4 -o route get "${_vl_host}" 2> /dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
+    [ -n "${_src}" ] || return 0
+    _seen="$(curl -sf -m 15 -G "http://${_vl_host}:9428/select/logsql/query" \
+        --data-urlencode "query=_time:15m hostname:dns-server remote_ip:${_src} | limit 1")" \
+        || { echo "sync-zones: warning: VictoriaLogs not reachable; query-log export not checked" >&2; return 0; }
+    [ -n "${_seen}" ] && return 0
+    echo "sync-zones: no query logs from ${_src} in VictoriaLogs for 15 minutes; re-applying ${LOG_EXPORTER_APP} config"
+    configure_log_exporter
+}
+
+ensure_log_export
+
 PREV_HEAD="$(git -C "${BASEDIR}" rev-parse HEAD)"
 
 git -C "${BASEDIR}" pull

@@ -73,6 +73,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 - DNS record for logs.markridgwell.com (VictoriaLogs and its MCP server, via Traefik) pointing to the proxies (192.168.150.250/.251 and their IPv6 addresses)
 ### Fixed
+- Query logs self-heal: every sync-zones run checks VictoriaLogs has seen this node in the last 15 minutes and, if not, re-applies the Log Exporter config, which recreates its UDP syslog sink. The sink died for good when monitoring rebooted on 2026-11-25, so dns-01, 02, 04 and 05 silently stopped sending query logs for 23 hours.
 - The zone query ACL no longer refuses the Databases VLAN (192.168.130.0/24 and 2a02:8010:61d5:130::/64): it is a trusted server network, and blocking it stopped sql-server resolving pacman.markridgwell.com and the other internal names
 - Egress: serialise runs with a lock and write the resolved-address cache through a unique temp file, so the refresh timer and the firewall sync starting together no longer fail with FileNotFoundError
 - Corrected `xerox-b210-wired.lan` from the stale `192.168.86.156` to its Printers VLAN reservation `192.168.66.75`, moving its PTR from `zones/86.168.192.in-addr.arpa.db` to `zones/66.168.192.in-addr.arpa.db`.
