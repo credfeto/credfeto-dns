@@ -108,6 +108,7 @@ docker compose restart dns-server
 | `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
 | `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
 | `scripts/check-zone-sync` | Fail if any internal A/AAAA record has no matching PTR, or any PTR target has no A/AAAA record for its address. Run by the `PR: Zone Sync Check` workflow. |
+| `scripts/check-zone-names` | Fail if a zone holds a name that belongs in a sub-zone, or a parent-zone name for a sub-zone host that isn't a CNAME to it (see [Zone name rules](#zone-name-rules)). Run by the `PR: Zone Lint` workflow. |
 
 ## Files
 
@@ -134,10 +135,12 @@ Zones are maintained as BIND-format `.db` files in `zones/`. Technitium writes i
 
 | File | Zone type | Purpose |
 | --- | --- | --- |
-| `lan.db` | Primary | `.lan` hostnames (Proxmox nodes, network devices) |
+| `lan.db` | Primary | `.lan` hostnames (Proxmox nodes, servers), plus CNAMEs to sub-zone hosts |
 | `dns.lan.db` | Primary | DNS server hostnames |
 | `storage.lan.db` | Primary | Storage VLAN hosts (NASes) |
 | `proxy.markridgwell.com.db` | Primary | A/AAAA records → `192.168.140.250` (proxy-01) and `192.168.140.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
+| `network.lan.db` | Primary | Network device hostnames (firewall, switches, access points) |
+| `orchestrator.lan.db` | Primary | Orchestrator hosts |
 | `<service>.markridgwell.com.db` | Override | Per-service A/AAAA → both proxy addresses (round-robin) |
 | `<resolver>.db` | Override | DoH resolver IP overrides (Cloudflare, Google, Quad9) |
 
@@ -165,6 +168,23 @@ cp zones/audiobookshelf.markridgwell.com.db zones/newservice.markridgwell.com.db
 Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `check-proxy-ips` with no address arguments checks the current default set (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250` and `2a02:8010:61d5:140::251`), which `scripts/self-test` relies on, so update the defaults in the script when a proxy address changes.
 
 `replace-proxy-ip` only changes A/AAAA records. The following still need updating by hand: the reverse PTR records in `140.168.192.in-addr.arpa.db` and `0.4.1.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa.db` (bump their serials too), the egress allow-list in `scripts/egress`, and `docs/network/egress-whitelist.md`. Grep the repo for the old IP to find every occurrence rather than relying on this list staying exhaustive.
+
+### Zone name rules
+
+`scripts/check-zone-names` enforces two rules over every forward zone in `zones/`:
+
+1. **One label per name.** An owner name is a single label below its zone. A dotted name such as `nas-01.storage` in `lan.db` belongs in its own zone file (`zones/storage.lan.db`, as `nas-01`), whether or not that file exists yet. Leading `_` labels (`_sip._tcp`, `_acme-challenge.www`) don't count. Reverse (`.arpa`) zones are exempt.
+2. **Flat aliases are CNAMEs.** When a host has A/AAAA records in a sub-zone, a name for it in the parent zone must be exactly one CNAME to the full sub-zone name and nothing else. For `dns-06.dns.lan`, `lan.db` holds only `dns-06 IN CNAME dns-06.dns.lan.`. PTR records point at the sub-zone name.
+
+Each error names the file, the line and the fix. Run it, with the other zone checks, before pushing a zone change:
+
+```sh
+python3 scripts/check-zone-names
+python3 scripts/check-zone-sync
+python3 -m unittest discover -s scripts/tests
+```
+
+The required `PR: Zone Lint` workflow runs these on every pull request, together with BIND's `named-checkzone` over every `zones/*.db` (zone name from the file name), which catches syntax, SOA/NS and CNAME-and-other-data errors.
 
 ## Security notes
 

@@ -1,7 +1,7 @@
 $ORIGIN lan.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    30      ; serial
+    31      ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -10,26 +10,20 @@ $TTL 3600
 @ IN NS dns-server.
 
 firewall            IN A 192.168.10.1
-stairs-01           IN A 192.168.10.2
-stairs-02           IN A 192.168.10.3
-office              IN A 192.168.10.4
-bedroom             IN A 192.168.10.5
-ap-office           IN A 192.168.10.7
-ap-bedroom          IN A 192.168.10.8
-ap-stairs           IN A 192.168.10.6
-ap-garden           IN A 192.168.10.9
-dns-01              IN A 192.168.42.101
-dns-01              IN AAAA 2a02:8010:61d5:42::101
-dns-02              IN A 192.168.42.102
-dns-02              IN AAAA 2a02:8010:61d5:42::102
-dns-03              IN A 192.168.42.103
-dns-03              IN AAAA 2a02:8010:61d5:42::103
-dns-04              IN A 192.168.42.104
-dns-04              IN AAAA 2a02:8010:61d5:42::104
-dns-05              IN A 192.168.42.105
-dns-05              IN AAAA 2a02:8010:61d5:42::105
-dns-06              IN A 192.168.42.106
-dns-06              IN AAAA 2a02:8010:61d5:42::106
+stairs-01           IN CNAME stairs-01.network.lan.
+stairs-02           IN CNAME stairs-02.network.lan.
+office              IN CNAME office.network.lan.
+bedroom             IN CNAME bedroom.network.lan.
+ap-office           IN CNAME ap-office.network.lan.
+ap-bedroom          IN CNAME ap-bedroom.network.lan.
+ap-stairs           IN CNAME ap-stairs.network.lan.
+ap-garden           IN CNAME ap-garden.network.lan.
+dns-01              IN CNAME dns-01.dns.lan.
+dns-02              IN CNAME dns-02.dns.lan.
+dns-03              IN CNAME dns-03.dns.lan.
+dns-04              IN CNAME dns-04.dns.lan.
+dns-05              IN CNAME dns-05.dns.lan.
+dns-06              IN CNAME dns-06.dns.lan.
 proxmox-01          IN A 192.168.86.11
 proxmox-02          IN A 192.168.86.12
 proxmox-03          IN A 192.168.86.13
@@ -44,10 +38,6 @@ defi                IN A 192.168.150.12
 notifications       IN A 192.168.150.15
 dev-upgrader-01     IN A 192.168.180.20
 dev-upgrader-02     IN A 192.168.150.21
-credfeto.orchestrator     IN A 192.168.170.23
-credfeto.orchestrator     IN AAAA 2a02:8010:61d5:170::17
-funfair-tech.orchestrator IN A 192.168.170.24
-funfair-tech.orchestrator IN AAAA 2a02:8010:61d5:170::18
 memory              IN A 192.168.150.30
 trmnl               IN A 192.168.150.31
 oxidized            IN A 192.168.150.32
@@ -67,5 +57,5 @@ audio-bookshelf     IN A 192.168.150.16
 dev-cache-01        IN A 192.168.200.100
 dev-cache-02        IN A 192.168.200.101
 immich              IN A 192.168.150.154
-netgear-proxmox-cluster IN A 192.168.10.10
+netgear-proxmox-cluster IN CNAME netgear-proxmox-cluster.network.lan.
 familiar            IN A 192.168.190.129

@@ -20,6 +20,12 @@ A single IP must resolve to exactly one PTR name, even when several forward zone
 * Example: a node with its own dedicated zone and per-node sub-records (e.g. `zones/proxy.markridgwell.com.db`'s `01`/`02` records for the two reverse-proxy nodes) uses `<sub-label>.<owning-zone>.` from that dedicated zone (e.g. `01.proxy.markridgwell.com.`), never one of the many other zones that merely copy the same address (e.g. the public-facing `*.markridgwell.com` service zones that all resolve to the proxy pair).
 * If a new ambiguous case comes up that isn't covered by the principle above, ask before picking a name rather than guessing.
 
+## Sub-zone names (MANDATORY)
+
+* An owner name in a forward zone is a single label. A host under a sub-domain (e.g. `nas-01.storage.lan`) goes in that sub-domain's own zone file (`zones/storage.lan.db`), never as `nas-01.storage` in `zones/lan.db`. Create the sub-zone file if it doesn't exist.
+* If a sub-zone host also needs a flat name in the parent zone, the flat name is exactly `<host> IN CNAME <host>.<sub-zone>.` with no other records, and bump the parent zone's serial.
+* Enforced by `scripts/check-zone-names`, which the required `PR: Zone Lint` workflow runs on every pull request.
+
 ## Keeping reverse zones in sync (MANDATORY)
 
 * Whenever an A or AAAA record is added, changed, or removed in any forward zone file, update the matching reverse zone's PTR record in the same commit, applying the "Choosing the PTR target name" rule above.

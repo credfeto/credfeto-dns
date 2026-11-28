@@ -1,0 +1,15 @@
+$ORIGIN orchestrator.lan.
+$TTL 3600
+@ IN SOA dns-server. admin. (
+    1       ; serial
+    900     ; refresh
+    300     ; retry
+    604800  ; expire
+    300     ; minimum TTL
+)
+@ IN NS dns-server.
+
+credfeto      IN A 192.168.170.23
+credfeto      IN AAAA 2a02:8010:61d5:170::17
+funfair-tech  IN A 192.168.170.24
+funfair-tech  IN AAAA 2a02:8010:61d5:170::18

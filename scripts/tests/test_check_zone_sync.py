@@ -1,39 +1,28 @@
 """Tests for scripts/check-zone-sync."""
 
-import importlib.machinery
-import importlib.util
-import io
-import ipaddress
-import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from ipaddress import ip_address
 from pathlib import Path
+from unittest import TestCase, main
+
+from script_loader import load_script, load_zone_files
 
 TESTS_DIR = Path(__file__).resolve().parent
 FIXTURES = TESTS_DIR / "fixtures"
 REVERSE_ZONE = "1.168.192.in-addr.arpa."
 IPV6_REVERSE_ZONE = "1.0.0.0.5.d.1.6.0.1.0.8.2.0.a.2.ip6.arpa."
 
-
-def load_script():
-    """Import the extensionless check-zone-sync script as a module."""
-    path = str(TESTS_DIR.parent / "check-zone-sync")
-    loader = importlib.machinery.SourceFileLoader("check_zone_sync", path)
-    spec = importlib.util.spec_from_loader("check_zone_sync", loader)
-    module = importlib.util.module_from_spec(spec)
-    loader.exec_module(module)
-    return module
-
-
-check_zone_sync = load_script()
+check_zone_sync = load_script("check-zone-sync")
+zone_files = load_zone_files()
 
 
 def check(case):
     """Run the check over one fixture directory."""
-    zones = check_zone_sync.load_zones(FIXTURES / case)
+    zones = zone_files.load_zones(FIXTURES / case)
     return check_zone_sync.check_zones(zones)
 
 
-class CheckZonesTests(unittest.TestCase):
+class CheckZonesTests(TestCase):
     """Forward and reverse zone comparison over the fixture zones."""
 
     def test_clean_zones_have_no_errors(self):
@@ -90,64 +79,23 @@ class CheckZonesTests(unittest.TestCase):
         """Any of several forward names for an address is a valid target."""
         self.assertEqual([], check("multiple_forward_names"))
 
-
-class ParseZoneTests(unittest.TestCase):
-    """Zone file parsing."""
-
-    def test_names_are_made_absolute(self):
-        """Owners and PTR targets resolve against the current origin."""
-        zone = check_zone_sync.parse_zone(
-            "lan",
-            "@ IN A 192.168.1.1\n"
-            "host IN A 192.168.1.2\n"
-            "Abs.Example. IN A 192.168.1.3\n"
-            "$ORIGIN sub.lan.\n"
-            "ptr IN PTR target\n",
-        )
-        self.assertEqual("lan.", zone.name)
-        self.assertEqual(
-            [
-                ("lan.", "A", "192.168.1.1"),
-                ("host.lan.", "A", "192.168.1.2"),
-                ("abs.example.", "A", "192.168.1.3"),
-                ("ptr.sub.lan.", "PTR", "target.sub.lan."),
-            ],
-            [(rec.owner, rec.rtype, rec.data) for rec in zone.records],
-        )
-
-    def test_parenthesised_records_and_comments(self):
-        """A multi-line SOA parses as one record and comments are ignored."""
-        zone = check_zone_sync.parse_zone(
-            "lan",
-            "@ IN SOA ns. admin. ( ; start\n"
-            "    1 ; serial\n"
-            "    300 )\n"
-            "; host IN A 192.168.1.9\n"
-            "host IN A 192.168.1.2 ; trailing\n",
-        )
-        self.assertEqual(
-            [("lan.", "SOA"), ("host.lan.", "A")],
-            [(record.owner, record.rtype) for record in zone.records],
-        )
-
     def test_ipv6_reverse_name(self):
         """IPv6 addresses reverse to 32 nibbles under ip6.arpa."""
-        address = ipaddress.ip_address("2a02:8010:61d5:1::10")
+        address = ip_address("2a02:8010:61d5:1::10")
         self.assertEqual(
             f"0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.{IPV6_REVERSE_ZONE}",
             check_zone_sync.reverse_name(address),
         )
 
 
-class MainTests(unittest.TestCase):
+class MainTests(TestCase):
     """Command line behaviour."""
 
     def run_main(self, *argv):
         """Run main and capture its exit code and output streams."""
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            code = check_zone_sync.main(list(argv))
+        stdout = StringIO()
+        stderr = StringIO()
+        code = check_zone_sync.main(list(argv), (stdout, stderr))
         return code, stdout.getvalue(), stderr.getvalue()
 
     def test_in_sync_exits_zero(self):
@@ -175,4 +123,4 @@ class MainTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
