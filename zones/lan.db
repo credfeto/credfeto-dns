@@ -1,7 +1,7 @@
 $ORIGIN lan.
 $TTL 3600
 @ IN SOA dns-server. admin. (
-    30      ; serial
+    31      ; serial
     900     ; refresh
     300     ; retry
     604800  ; expire
@@ -53,6 +53,8 @@ trmnl               IN A 192.168.150.31
 oxidized            IN A 192.168.150.32
 linux-cache-01      IN A 192.168.210.200
 linux-cache-02      IN A 192.168.210.201
+nas-01.storage      IN A 192.168.220.17
+nas-02.storage      IN A 192.168.220.18
 monitoring          IN A 192.168.160.134
 development         IN A 192.168.180.176
 arch-vm-test        IN A 192.168.150.177
