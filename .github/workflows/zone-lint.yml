@@ -1,0 +1,65 @@
+--- # PR: check every zone file is valid and every name is in its own zone
+name: "PR: Zone Lint"
+on:
+  # No paths filter: this is a required check, so it has to report on every PR.
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, unlocked]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{github.workflow}}-${{github.ref}}"
+  cancel-in-progress: true
+
+jobs:
+  # @@required: merge
+  zone-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Initialise Workspace"
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: sudo chown -R "$USER:$USER" "$GITHUB_WORKSPACE"
+
+      - name: "Checkout Source"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          fetch-depth: 1
+
+      - name: "Run zone script unit tests"
+        shell: bash
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: "Check zone names"
+        shell: bash
+        run: python3 scripts/check-zone-names
+
+      - name: "Install named-checkzone"
+        shell: bash
+        run: |
+          if ! command -v named-checkzone > /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends bind9-utils
+          fi
+          named-checkzone -v
+
+      - name: "Check zone files with named-checkzone"
+        shell: bash
+        run: |
+          failed=0
+          for file in zones/*.db; do
+            zone="$(basename "$file" .db)"
+            if ! output="$(named-checkzone -k fail -i full "$zone" "$file" 2>&1)"; then
+              failed=1
+              echo "::error file=$file::named-checkzone rejected zone $zone"
+              printf '%s\n' "$output"
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "✓ named-checkzone: every zone file loads"

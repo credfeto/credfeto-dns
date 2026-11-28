@@ -8,6 +8,7 @@ on:
     paths:
       - "zones/**"
       - "scripts/check-zone-sync"
+      - "scripts/zone_files.py"
       - "scripts/tests/**"
       - ".github/workflows/zone-sync-check.yml"
 

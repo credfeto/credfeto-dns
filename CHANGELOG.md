@@ -74,6 +74,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added `wiki.markridgwell.com` zone resolving to the reverse-proxy pair (#49)
 - DNS record for logs.markridgwell.com (VictoriaLogs and its MCP server) pointing to the proxies
 - DNS zone for edge-familiar.markridgwell.com, Familiar's inbound webhook entry point on the proxies
+- Required zone lint: sub-zone names in own zones, flat aliases as CNAMEs, plus named-checkzone
 ### Fixed
 - Query logs self-heal: sync-zones re-applies the Log Exporter config when VictoriaLogs is silent
 - The zone query ACL no longer refuses the trusted Databases VLAN (192.168.130.0/24 and its /64)
