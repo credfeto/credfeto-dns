@@ -103,7 +103,7 @@ docker compose restart dns-server
 | `update` | Full update: pull, start container, apply firewall rules |
 | `scripts/sync-zones` | Pull latest; import changed zones via API. Refreshes the egress table first. If the pulled commits change host config (`update`, `docker-compose.yml`, `scripts/egress`, its units or `scripts/github-egress-ranges`) that hasn't been applied yet, it runs `./update` instead. `--all` imports every zone. |
 | `scripts/egress` | Builds and loads the egress nftables table `inet dns_egress` (installed as `/usr/local/bin/dns-egress`; run by `update`, `sync-zones` and `dns-egress-refresh.timer`). Loads only when the rendered table differs from the loaded one. |
-| `scripts/update-github-egress-ranges` | Regenerates `scripts/github-egress-ranges` from https://api.github.com/meta. Run by the `Repo: Update GitHub egress ranges` workflow, not on a DNS node. |
+| `scripts/update-github-egress-ranges` | Regenerates `scripts/github-egress-ranges` from <https://api.github.com/meta>. Run by the `Repo: Update GitHub egress ranges` workflow, not on a DNS node. |
 | `reset` | Stop and remove containers, then run `update` |
 | `scripts/replace-proxy-ip` | Replace a proxy address in every zone's A/AAAA records and bump each changed zone's serial. `--dry-run` lists the files without changing them. |
 | `scripts/check-proxy-ips` | Fail if any zone carries some, but not all, of the proxy addresses. Run offline by `scripts/self-test`. |
@@ -136,6 +136,7 @@ Zones are maintained as BIND-format `.db` files in `zones/`. Technitium writes i
 | --- | --- | --- |
 | `lan.db` | Primary | `.lan` hostnames (Proxmox nodes, network devices) |
 | `dns.lan.db` | Primary | DNS server hostnames |
+| `storage.lan.db` | Primary | Storage VLAN hosts (NASes) |
 | `proxy.markridgwell.com.db` | Primary | A/AAAA records → `192.168.140.250` (proxy-01) and `192.168.140.251` (proxy-02), plus `01.`/`02.` sub-records pinned to each individually |
 | `<service>.markridgwell.com.db` | Override | Per-service A/AAAA → both proxy addresses (round-robin) |
 | `<resolver>.db` | Override | DoH resolver IP overrides (Cloudflare, Google, Quad9) |
@@ -178,6 +179,6 @@ Both scripts accept `--zones DIR` to work on a directory other than `zones/`. `c
 The host's outbound traffic is filtered by one nftables table, `inet dns_egress`, which `scripts/egress` builds and loads. Technitium uses host networking, so its recursion, forwarding, blocklist downloads and log shipping all go through the table's `host_out` chain (the `output` hook). Watchtower, on a Docker bridge, is not filtered by it.
 
 - **Allowed:** DNS (53/tcp+udp) to any destination, since recursive resolution reaches every authoritative server; HTTPS (443/tcp) to the proxies (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`), NextDNS, download.technitium.com, GitHub Pages (Fastly), GitHub's published ranges and the resolved addresses of github.com, cdn-mirror.chaotic.cx, pkgstats.archlinux.de and openpgpkey.archlinux.org; NTP to `192.168.42.1`; SQL Server (1433/tcp) on `192.168.130.254`; VictoriaLogs (9428/tcp) and syslog (514/udp) on `192.168.160.134`; ICMPv6, IGMP and DHCPv6. `scripts/egress` holds the list, and `docs/network/egress-whitelist.md` the reasons.
-- **Enforcement:** on by default: unmatched new connections are dropped. Set `DNS_EGRESS_ENFORCE=false` in `.env` for observation mode, where they are accepted. Any other value, or none, enforces. In both modes unmatched connections are logged with the kernel log prefix `dns-egress-unmatched: ` (at most 30 a minute).
+- **Enforcement:** on by default: unmatched new connections are dropped. Set `DNS_EGRESS_ENFORCE=false` in `.env` for observation mode, where they are accepted. Any other value, or none, enforces. In both modes unmatched connections are logged with the kernel log prefix `dns-egress-unmatched:` (with a trailing space) (at most 30 a minute).
 - **Refresh:** `dns-egress-refresh.service` runs `/usr/local/bin/dns-egress` at boot, before Docker starts, and `dns-egress-refresh.timer` runs it every 10 minutes; `sync-zones` runs it before each pull. Each run resolves the names (keeping the last good answer, in `/var/lib/credfeto-adguard-home/egress-resolved.json`, for a name that does not resolve) and reads `/usr/local/share/credfeto-adguard-home/github-egress-ranges`. The table, sets included, is replaced in one `nft -f` transaction, only when it changed, and is checked with `nft -c` first, so a rejected ruleset leaves the loaded one in place. firewalld is never reloaded for egress.
 - **Migration:** on a node that still has the firewalld `dns-egress` policy and `dns-egress-*` ipsets, `update` loads and verifies the table first, then deletes the policy and ipsets and activates that with a single `firewall-cmd --reload`.

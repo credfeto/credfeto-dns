@@ -16,6 +16,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - The proxies' Servers VLAN addresses are no longer trusted for egress, port 538 or the proxy ACL
 - The proxies' DMZ VLAN addresses are trusted for egress, port 538 and the reverse proxy ACL
 ### Added
+- New `storage.lan` zone: `nas-01`/`nas-02` (Storage VLAN 22, `192.168.220.17/18`) with PTRs
 - DNS query logs go to VictoriaLogs via the Technitium Log Exporter app over syslog on 514/udp
 - Egress allow-list: VictoriaLogs on monitoring.lan (9428/tcp) for systemd-journal-upload
 - DNS-over-TCP-PROXY on port 538 for DNS-over-TLS via the proxies, open to the proxies only
